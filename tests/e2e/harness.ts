@@ -18,7 +18,9 @@ export const activationCode = process.env.DENTIVA_ACTIVATION_CODE ?? ''
 export const e2eSkipReason =
   'The end-to-end suite needs the built application (npm run build:app) and, for the setup wizard, DENTIVA_ACTIVATION_CODE.'
 
-export const adminPassword = 'E2E-Admin-Passw0rd!#'
+// The password policy refuses a password that contains the username (a real rule, enforced by the service
+// layer), so the test credential must not contain "admin".
+export const adminPassword = 'Dentiva-E2E-Passw0rd!2026'
 
 export interface LaunchedApp {
   app: ElectronApplication

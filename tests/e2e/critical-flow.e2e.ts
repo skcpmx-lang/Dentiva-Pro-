@@ -16,6 +16,7 @@ import {
   e2eSkipReason,
   invoke,
   launchApp,
+  signInThroughUi,
   waitForShell,
   type LaunchedApp
 } from './harness'
@@ -78,6 +79,15 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
   test.beforeAll(async () => {
     app = await launchApp()
     const { page } = app
+
+    // A retry of this serial group resumes on the installation the previous attempt configured: the wizard
+    // is only driven when the application still asks for it.
+    const setupStatus = await invoke<{ setupRequired: boolean }>(page, 'setup.status')
+    if (!setupStatus.setupRequired) {
+      await signInThroughUi(page)
+      await waitForShell(page)
+      return
+    }
 
     // Complete the wizard through the real service layer, then sign in so the shell renders.
     const activation = await invoke<{ activated: boolean }>(page, 'setup.activate', { code: activationCode })

@@ -39,9 +39,15 @@ test.describe('Setup wizard and application shell', () => {
 
     const status = await invoke<{ setupRequired: boolean; activationRequired: boolean }>(page, 'setup.status')
     expect(status.setupRequired).toBe(true)
-    expect(status.activationRequired).toBe(true)
-
-    await completeSetupThroughUi(page)
+    if (status.setupRequired) {
+      // A virgin installation must ask for both the activation code and the clinic profile. Playwright
+      // retries a serial group against the same application, so a retry resumes on the installation the
+      // first attempt left behind instead of pretending the wizard has never run.
+      expect(status.activationRequired).toBe(true)
+      await completeSetupThroughUi(page)
+    } else {
+      await signInThroughUi(page)
+    }
     await waitForShell(page)
 
     // The wizard wrote real records: clinic profile, one dentist and one administrator account.

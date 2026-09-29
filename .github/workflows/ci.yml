@@ -179,7 +179,7 @@ jobs:
         if: steps.e2e.outcome == 'failure'
         shell: bash
         run: |
-          node scripts/ci-annotate.mjs e2e-output.txt "End-to-end suite failed"
+          node scripts/ci-annotate.mjs e2e-output.txt "End-to-end suite failed" test-results/e2e-results.json
           exit 1
 
       - name: Upload Playwright results
