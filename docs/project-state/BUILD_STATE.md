@@ -8,9 +8,9 @@
 
 ```yaml
 project: Dentiva Pro
-current_phase: 5 - Verification and delivery (feature surface implemented, acceptance evidence being built)
+current_phase: 5 - Verification and delivery (feature surface implemented; acceptance evidence, audits and release documents being completed)
 branch: arena/01a0ee4f-dentiva-pro
-last_updated: 2026-09-29
+last_updated: 2026-09-30
 ```
 
 ## Status
@@ -22,8 +22,11 @@ last_updated: 2026-09-29
 | Database schema + migrations + repositories | **Complete** (migrations 0001–0003; fixture/checksum tests pending) |
 | Services + IPC router (business-layer authorization) | **Complete** (~140 channels, every service checks permissions) |
 | Renderer design system + shell + feature screens | **Complete** (prescriptions screen runs on the real channels; verified through the router in the preview harness) |
-| Unit tests | **104 passing** (money 16, date 15, dental/ids/csv 17, printing 21, security 15, validation 20) |
-| Integration tests | **65 passing** (setup/auth 9, clinical 10, billing 13, admin 18, backup/audit 15) |
+| Unit tests | **127 passing** (8 files) — money 16, date 15, dental/ids/csv 17, printing 21, security 15, validation 20, session/activation 14, window state 8 |
+| Integration tests | **91 passing** (7 files) — setup/auth 10, clinical 10, billing 13, admin 18, backup/audit 15, security hardening 15 (router boundary, migrations, aborted transactions, activation tamper, global search), reports 10 |
+| Pre-release audits (master §113) | **Running** — `npm run audit:prerelease` executes 14 audits; the Windows-only two report a reasoned skip |
+| Requirements traceability matrix | **Complete** — `docs/testing/TRACEABILITY_MATRIX.md`, regenerated and freshness-checked in CI |
+| Release readiness document | **Written** — `docs/release/RELEASE_READINESS.md` (verdict: not releasable until the Windows evidence exists) |
 | End-to-end (Electron) suites | **Written, first run pending on windows-latest** |
 | Performance measurement (NFR-003) | **Measured** — `docs/testing/PERFORMANCE_MEASUREMENTS.md` |
 | Dependency/licence audit + third-party notices | **Complete** (`npm run audit:deps`, `npm run licenses`) |
@@ -34,8 +37,8 @@ last_updated: 2026-09-29
 ## Machine-readable task state
 
 ```yaml
-current_task: Prescriptions print/void corrections shipped; next is the remaining pre-release audit sweep
-next_task: Pre-release audits (spec §113), then the packaged Windows installer run on windows-latest
+current_task: §113 pre-release audits, traceability matrix and release-readiness document shipped; next is the packaged Windows installer run on windows-latest
+next_task: Run the CI and Release workflows on windows-latest (activate the DENTIVA_ACTIVATION_CODE repository secret first), then complete docs/release/RELEASE_READINESS.md with the executed evidence
 completed:
   - docs/* (requirements, architecture, ADRs, database, security, ux, printing, backup-restore, testing, compliance, project-state, user guide)
   - src/shared/** (money incl. fromDecimalString, date, ids, dental, csv, permissions, validation, constants, printing models)
@@ -49,15 +52,51 @@ completed:
   - maintenance tooling (dependency audit, third-party notices, backup verifier, release artifact verifier, stress seeder, preview harness)
   - GitHub Actions ci.yml + release.yml, Playwright config + e2e suites
 in_progress:
-  - Remaining pre-release audits and the packaged installer run (the prescriptions screen rewrite itself is complete and verified through the real router)
+  - Windows-only evidence: Electron end-to-end suites, installer build/install/uninstall, print matrix and DPI screenshots (everything else is verified locally or by the CI quality/maintenance jobs)
 failed_tests: []
 known_issues:
   - Electron cannot run in the development sandbox (no binary), so E2E, PDF fidelity, print matrix and DPI checks only run on windows-latest.
+  - The sandbox `npm install` cannot compile better-sqlite3 (no reachable Node headers) and its prebuild download is blocked, so use `npm install --ignore-scripts`: the published tarball already contains `prebuilds/{linux,win32}-x64.node` and loads correctly.
+  - The activation code is no longer written anywhere in the repository (the test fixtures were replaced with a synthetic code and the shipped verifier is exercised only through `DENTIVA_ACTIVATION_CODE`); audit A2 of `npm run audit:prerelease` fails the build if a code-shaped literal reappears.
   - Empty folders kept out of git (for example an empty attachments directory) must be created by the code at runtime; do not re-add committed placeholder files.
 pending_fixes: []
 last_successful_build: green (electron-vite build, out/renderer ~1.45 MB js + 49 kB css; GitHub Actions quality job green)
-last_successful_test: 169 passing locally (104 unit + 65 integration) with DENTIVA_ACTIVATION_CODE set; without it the activation-dependent integration suites report as skipped by design. GitHub CI: lint/types/build/unit + maintenance jobs green, integration + e2e waiting for the repository secret.
+last_successful_test: 218 passing locally (127 unit + 91 integration) with DENTIVA_ACTIVATION_CODE set; without it the activation-dependent integration suites report as skipped by design (133 passed / 85 skipped). GitHub CI: lint/types/build/unit + maintenance jobs green, integration + e2e waiting for the repository secret.
 ```
+
+## Corrections found by auditing the repository (2026-09-30, keep them fixed)
+
+1. **The activation code was committed in three test files** while ADR-0004 claims it is never written
+   anywhere in the repository. `createVerifierFromSecret` / `createActivationVerifier` were added to
+   `src/main/security/activation.ts`, the unit suite now proves the verifier against a synthetic code, the
+   integration suite exercises the shipped verifier only through `DENTIVA_ACTIVATION_CODE`, and audit A2 of
+   `npm run audit:prerelease` fails the build if a 16-digit code-shaped literal reappears.
+2. **The lock-out guard for user accounts was wrong.** `AdminService`'s sibling in `AuthService` counted
+   holders of `users.manage` in any role and discarded its role argument, so an account manager could
+   deactivate the last administrator while the error message claimed otherwise. The guard now counts both
+   what would remain (administrators in the role, and effective holders of the permission, overrides
+   honoured) and is covered by `admin.test.ts`.
+3. **The root `.gitignore` ignored `docs/release/`.** The unanchored `release/` pattern matched the
+   documentation folder as well as the electron-builder output; both are now anchored (`/release/`).
+4. **The command palette search field had no accessible name** (placeholder only). Audit A12 now proves
+   every form control in the renderer carries an accessible name.
+5. **Four export buttons could not work.** The reports screen asked the export service for
+   `report_<key>`, the audit screen for `audit_log` and the inventory screen for
+   `inventory_transactions` — none of which the service (or its payload schema) accepts, and the settings
+   screen gated the invoice export on `data.export` while the service requires
+   `reports.financial.export`. Fixed by: a dedicated `reports.export` channel that writes exactly the report
+   the screen shows (same headers, rows and summary block, audited); typed `ExportEntity` union so the
+   compiler refuses an entity the service cannot produce; a real `inventory_movements` dataset for the
+   inventory ledger; matching permission gates and error toasts on the settings screen. Tests:
+   `reports.test.ts` (report CSV), `security-hardening.test.ts` (the channel through the real router),
+   `admin.test.ts` (movements export).
+6. **The auditor role could not export the audit log.** `export.data` is gated on `data.export` at the
+   router and narrowed per entity in the service, so a role holding only `audit.export` was refused before
+   the service ran. The auditor now carries `data.export`, and a unit test asserts that every role able to
+   export a dataset also holds the channel permission.
+7. **The traceability freshness check was date-dependent.** The generator stamped the file with the current
+   date and CI compared it byte for byte, so the check would have failed on the next day even with an
+   unchanged repository. The timestamp is gone; `npm run docs:traceability -- --check` is now stable.
 
 ## Corrections found by running the app (2026-09-30, keep them fixed)
 

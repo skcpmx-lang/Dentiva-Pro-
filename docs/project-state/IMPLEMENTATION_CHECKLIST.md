@@ -20,12 +20,12 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 1.1 | Electron 38 + React 19 + TypeScript strict, electron-vite bundling | **Done** | `npm run build` produces `out/main`, `out/preload`, `out/renderer` |
 | 1.2 | Renderer sandboxed: contextBridge only, no Node in the renderer | **Done** | `src/preload/index.ts`, `createInvoker` router |
 | 1.3 | SQLite via better-sqlite3 with WAL, foreign keys, busy timeout | **Done** | `src/main/db/connection.ts`; integration suites run against it |
-| 1.4 | Versioned migrations with checksums | **Partial** | `src/main/db/migrations.ts` (3 migrations); a checksum-mismatch test and a v1-fixture upgrade test are still missing |
+| 1.4 | Versioned migrations with checksums | **Partial** | `src/main/db/migrations.ts` (4 migrations); `security-hardening.test.ts` covers the full chain on an empty file, the append-only guard and a checksum mismatch refusing to start. A committed v1-file upgrade fixture is still missing |
 | 1.5 | Immutable audit log (hash chain, append-only triggers) | **Done** | migrations 0003 triggers + `db/integrity.ts`; `backup-audit.test.ts` |
 | 1.6 | Service container + IPC registry/router with payload validation | **Done** | `ipc/registry.ts` (≈140 channels), `ipc/router.ts`; integration tests exercise them through the harness |
 | 1.7 | Restore-safe re-wiring (`reopenDb`, `rebuildContainer`) | **Done** | `src/main/index.ts`; `backup-audit.test.ts` restores and continues |
-| 1.8 | Logging with rotation and no secrets | **Partial** | `src/main/logging/logger.ts`; redaction asserted only indirectly |
-| 1.9 | Crash recovery | **Open** | No simulated-abort test yet (AT-F05) |
+| 1.8 | Logging with rotation and no secrets | **Partial** | `src/main/logging/logger.ts`; audit A6 asserts the redaction list and that no application file logs to a console — a runtime redaction assertion is still missing |
+| 1.9 | Crash recovery | **Partial** | `security-hardening.test.ts` proves a thrown mid-transaction write and a transaction abandoned by a second connection both roll back with integrity intact; a real process-kill test is still missing |
 
 ## 2. Setup, activation, security
 
@@ -34,25 +34,25 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 2.1 | Setup wizard (activation → clinic → dentists → administrator) | **Done** | `features/setup/SetupWizard.tsx`; `setup-auth.test.ts` covers the service layer; UI in `setup-wizard.e2e.ts` (first Windows run pending) |
 | 2.2 | Activation code verified by derived verifier (no plaintext) | **Done** | PBKDF2 verifier in `security/activation.ts`; `setup-auth.test.ts`; the code is absent from `src/` and `docs/` |
 | 2.3 | Activation throttling and audit | **Done** | 10 attempts / 60 s cooldown; `setup-auth.test.ts` |
-| 2.4 | Passwords: scrypt (N=2¹⁵, r=8, p=1), policy ≥10 chars, 5-failure lockout | **Partial** | Implemented; a dedicated unit test for the hash/verify/policy module is still missing (AT-B03) |
+| 2.4 | Passwords: scrypt (N=2¹⁵, r=8, p=1), policy ≥10 chars, 5-failure lockout | **Done** | `security.test.ts` (stored parameters, unique salts, wrong/tampered/unknown-scheme refusals, policy) and `setup-auth.test.ts` (lockout window) |
 | 2.5 | Session: auto-lock 5/10/15/30, Lock Now, unlock by password | **Done** | `security/session.ts`; `setup-auth.test.ts` (auto-lock) |
-| 2.6 | RBAC: role grants, per-user deny wins, last-admin guard, enforcement in services | **Partial** | Implemented (every service calls `require`); resolution unit test and a “denied service call” integration test are missing (AT-B04/B05) |
+| 2.6 | RBAC: role grants, per-user deny wins, last-admin guard, enforcement in services | **Done** | `security.test.ts` (order-independent deny resolution) and `admin.test.ts` + `security-hardening.test.ts` (service- and router-level refusals, lock-out guard for the last administrator **and** the last account manager) |
 | 2.7 | Destructive-action safeguards (typed phrase + password + pre-action backup) | **Done** | `admin-service.ts` (`RESTORE BACKUP`); `backup-audit.test.ts` |
 
 ## 3. Clinical
 
 | # | Item | Status | Evidence / what is missing |
 |---|---|---|---|
-| 3.1 | Patients: register, search, filters, archive/restore, unique codes | **Partial** | `clinical-service.ts`, `PatientsPage`; date-filter coverage missing (AT-C02) |
-| 3.2 | Patient profile: counts, timeline, history tabs, balances | **Partial** | `getPatientProfile`; timeline merge assertions missing (AT-C04) |
+| 3.1 | Patients: register, search, filters, archive/restore, unique codes | **Done** (service) | `clinical.test.ts` (codes, archive) and `admin.test.ts` (custom range, archived hidden unless asked); the screen itself is reviewed in the E2E pass |
+| 3.2 | Patient profile: counts, timeline, history tabs, balances | **Done** (service) | `admin.test.ts` merges visits, appointments, invoices and payments into one timeline; on-screen tabs are reviewed in the E2E pass |
 | 3.3 | Visits: create, finalise, amend, immutable history | **Done** | `clinical.test.ts` |
 | 3.4 | Dental chart (FDI, per-tooth entries tied to visits, history) | **Done** (service) | `clinical.test.ts`, `dental-ids-csv.test.ts`; on-screen interaction still to be reviewed in the E2E pass |
 | 3.5 | Appointments with the full status set and rescheduling | **Done** | `clinical.test.ts` |
 | 3.6 | Queue with priority, reorder and persistence | **Done** (ordering) | `clinical.test.ts`; restart-persistence assertion missing |
 | 3.7 | Prescriptions: structured C/C, O/E, R/E, advice; multi-medicine rows; draft/final; void | **Done** (service) | `clinical.test.ts`: full medicine model, reorder, draft→final, status filter, void reason/date; the screen runs on the same channels |
 | 3.8 | Referrals | **Done** | `clinical.test.ts` |
-| 3.9 | Treatment catalogue and clinical option lists | **Partial** | Repositories + services implemented; CRUD integration test missing (AT-E01) |
-| 3.10 | Attachments with safe file handling | **Partial** | `billing-service.attachFile` (path traversal, size limits) is used by the stress run; the validation assertions are missing (AT-E07) |
+| 3.9 | Treatment catalogue and clinical option lists | **Done** | `admin.test.ts` (catalogue create/rename/deactivate/reactivate, clinical options added and retired) |
+| 3.10 | Attachments with safe file handling | **Done** (service) | `admin.test.ts` (checksum, sanitised name, stored copy inside the data folder, disallowed type and oversized file refused) |
 
 ## 4. Billing and money
 
@@ -61,9 +61,9 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 4.1 | Integer-minor-unit money everywhere | **Done** | `shared/money.ts` (+`fromDecimalString`); `money.test.ts` |
 | 4.2 | Invoices: items, discounts, tax, round-off, void | **Done** | `billing.test.ts` |
 | 4.3 | Payments: all methods, references, advances, void, patient balance | **Done** | `billing.test.ts` |
-| 4.4 | Payment dashboard defaulting to today | **Partial** | Implemented; per-method totals assertion missing (AT-D03) |
+| 4.4 | Payment dashboard defaulting to today | **Done** | `reports.test.ts` (defaults to today, per-method totals, voided payments excluded and the invoice balance reopened) |
 | 4.5 | Accounting: invoiced revenue vs received cash, expenses, cash flow | **Done** | `billing.test.ts` |
-| 4.6 | Financial reports from real transactions | **Open** | Reports service exists; acceptance assertions and CSV export checks missing (AT-D08) |
+| 4.6 | Financial reports from real transactions | **Done** | `reports.test.ts` exercises all ten catalogue reports against real ledger rows (invoiced revenue separated from received cash, empty window still well-formed, permission refusal) and exports one to CSV through the real channel (`security-hardening.test.ts`); the generic CSV/JSON export path is asserted in `admin.test.ts` |
 | 4.7 | Inventory: batches, expiry, low stock, immutable ledger | **Partial** | `billing.test.ts` (stock, issue, low stock, over-issue); expiry notification path missing |
 
 ## 5. Printing and PDF
@@ -82,7 +82,7 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 6.1 | Manual backup (manifest, checksums, config, attachments, README) | **Done** | `backup-audit.test.ts`; `scripts/verify-backup.mjs` verified a real backup and detected tampering |
 | 6.2 | Automatic backup schedule and retention | **Done** | `backup-audit.test.ts` |
 | 6.3 | Restore with pre-restore backup, verification and rollback | **Done** | `backup-audit.test.ts` |
-| 6.4 | Data export / destructive data management | **Open** | Service exists (`exportData`, destructive actions); acceptance assertions missing (AT-E06) |
+| 6.4 | Data export / destructive data management | **Partial** | `admin.test.ts` asserts CSV/JSON export into a chosen folder and the permission refusal; the typed-confirmation destructive flows are exercised end to end on Windows |
 
 ## 7. Interface
 
@@ -109,8 +109,8 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 8.6 | CI pipeline (lint, types, tests, build, tools, E2E) | **Partial** | `.github/workflows/ci.yml` runs on GitHub: the lint/types/unit/build job and the maintenance-tools job are green. The integration and E2E jobs fail on purpose until the `DENTIVA_ACTIVATION_CODE` repository secret is added |
 | 8.7 | Windows installer build | **Pending** | `release.yml` + `npm run verify:installer`; requires windows-latest |
 | 8.8 | Clean-machine install / uninstall / data-preservation test | **Pending** | Checklist in `docs/release/` to be completed with evidence |
-| 8.9 | Release readiness document | **Pending** | `docs/release/RELEASE_READINESS.md` |
-| 8.10 | 14 pre-release audits (master §113) | **Pending** | Each audit is tracked in the acceptance checklist and the readiness document |
+| 8.9 | Release readiness document | **Done** | `docs/release/RELEASE_READINESS.md` — verdict, gate table, pending Windows evidence, and the documented deviations (mobile out of scope, activation limitation, DPI/uninstall evidence outstanding) |
+| 8.10 | 14 pre-release audits (master §113) | **Done** | `npm run audit:prerelease` (12 pass, the two Windows-only audits report a reasoned skip), wired into the CI maintenance job and the release workflow; the requirements traceability matrix is regenerated and freshness-checked |
 | 8.11 | User guide | **Done** | `docs/user-guide/USER_GUIDE.html` (shipped in the installer) |
 | 8.12 | Acceptance checklist with per-requirement status | **Done** | `docs/testing/ACCEPTANCE_TEST_CHECKLIST.md` (honest status: 25 pass / 6 written / 31 open) |
 
