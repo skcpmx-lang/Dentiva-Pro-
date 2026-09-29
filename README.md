@@ -90,7 +90,7 @@ driver ships N-API prebuilt binaries for Windows x64.
 ```bash
 npm run lint          # ESLint, zero warnings
 npm run typecheck     # TypeScript strict (node + web projects)
-npm test              # unit + integration suites
+npm test              # unit, component and integration suites
 npm run test:coverage # coverage report
 npm run test:e2e      # Playwright Electron acceptance tests (Windows)
 npm run audit:deps    # dependency + licence audit

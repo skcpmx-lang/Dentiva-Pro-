@@ -27,8 +27,8 @@ Reading order: *Verdict* → *Gates* → *Pending evidence* → *Known deviation
 | Lint | `npm run lint` (eslint, `--max-warnings 0`) | local + CI quality job | **Pass** |
 | Types | `npm run typecheck` (`tsconfig.node.json` + `tsconfig.web.json`) | local + CI quality job | **Pass** |
 | Build | `npm run build` (electron-vite: main, preload, renderer) | local + CI quality job | **Pass** (renderer ≈ 1.45 MB JS + 49 kB CSS) |
-| Unit tests | `npx vitest run tests/unit` | local | **Pass** — 8 files / 126 tests |
-| Integration tests | `DENTIVA_ACTIVATION_CODE=… npx vitest run tests/integration` | local | **Pass** — 7 files / 88 tests |
+| Unit tests | `npx vitest run tests/unit` | local | **Pass** — 9 files / 137 tests (including the component suite) |
+| Integration tests | `DENTIVA_ACTIVATION_CODE=… npx vitest run tests/integration` | local | **Pass** — 8 files / 105 tests |
 | Without the activation secret | `npx vitest run tests/integration` | local + CI | **Pass by skip** — activation-dependent suites report as skipped, never as passed |
 | Maintenance tools | `npm run audit:deps`, `npm run licenses`, `node scripts/verify-backup.mjs`, stress seeder (reduced scale) | local + CI maintenance job | **Pass** |
 | Pre-release audits (§113) | `npm run audit:prerelease` | local | **Pass** — 14 audits, all 12 host-independent ones pass (including a real backup produced and verified on the spot); the two Windows-only audits report a reasoned skip. The CI maintenance job runs the same command and uploads `pre-release-audit.md` as an artifact |
@@ -46,11 +46,12 @@ Reading order: *Verdict* → *Gates* → *Pending evidence* → *Known deviation
 | Suite | Files | Tests | Notes |
 |---|---|---|---|
 | Unit | 8 | 126 | money, date, ids/dental/csv, printing, security/RBAC, validation, session/activation, window state |
-| Integration | 7 | 88 | setup/auth, clinical, billing, admin, backup/audit, security hardening (router boundary, migrations, transactions, activation tamper, global search), reports (payment dashboard, all ten reports) |
+| Integration | 8 | 105 | setup/auth, clinical, billing, admin, backup/audit, security hardening (router boundary, migrations, transactions, activation/audit tamper, global search), reports (payment dashboard, all ten reports, CSV export), operations (destructive safeguards, reset, patient filters, notifications, setup validation, CSV import) |
 | End-to-end (Playwright + Electron) | 3 | written, not executed | setup wizard, critical 101-step flow — **requires windows-latest** |
 
-`docs/testing/ACCEPTANCE_TEST_CHECKLIST.md` carries the per-requirement detail: **45 Pass**, **8 partially
-verified or written-but-unexecuted**, **13 pending** (every pending row is Windows/Electron evidence).
+`docs/testing/ACCEPTANCE_TEST_CHECKLIST.md` carries the per-requirement detail: **53 Pass**, **4 pending
+with the test written** and **9 pending** (every remaining pending row is Windows/Electron evidence, a
+manual DPI/timing measurement, or packaging/CI infrastructure).
 
 ## Pending evidence (what is not yet proven)
 

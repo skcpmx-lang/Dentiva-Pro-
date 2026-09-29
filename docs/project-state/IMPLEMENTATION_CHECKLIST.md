@@ -20,7 +20,7 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 1.1 | Electron 38 + React 19 + TypeScript strict, electron-vite bundling | **Done** | `npm run build` produces `out/main`, `out/preload`, `out/renderer` |
 | 1.2 | Renderer sandboxed: contextBridge only, no Node in the renderer | **Done** | `src/preload/index.ts`, `createInvoker` router |
 | 1.3 | SQLite via better-sqlite3 with WAL, foreign keys, busy timeout | **Done** | `src/main/db/connection.ts`; integration suites run against it |
-| 1.4 | Versioned migrations with checksums | **Partial** | `src/main/db/migrations.ts` (4 migrations); `security-hardening.test.ts` covers the full chain on an empty file, the append-only guard and a checksum mismatch refusing to start. A committed v1-file upgrade fixture is still missing |
+| 1.4 | Versioned migrations with checksums | **Partial** | `src/main/db/migrations.ts` (5 migrations); `security-hardening.test.ts` covers the full chain on an empty file, the append-only guard and a checksum mismatch refusing to start. A committed v1-file upgrade fixture is still missing |
 | 1.5 | Immutable audit log (hash chain, append-only triggers) | **Done** | migrations 0003 triggers + `db/integrity.ts`; `backup-audit.test.ts` |
 | 1.6 | Service container + IPC registry/router with payload validation | **Done** | `ipc/registry.ts` (≈140 channels), `ipc/router.ts`; integration tests exercise them through the harness |
 | 1.7 | Restore-safe re-wiring (`reopenDb`, `rebuildContainer`) | **Done** | `src/main/index.ts`; `backup-audit.test.ts` restores and continues |
@@ -82,7 +82,7 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 6.1 | Manual backup (manifest, checksums, config, attachments, README) | **Done** | `backup-audit.test.ts`; `scripts/verify-backup.mjs` verified a real backup and detected tampering |
 | 6.2 | Automatic backup schedule and retention | **Done** | `backup-audit.test.ts` |
 | 6.3 | Restore with pre-restore backup, verification and rollback | **Done** | `backup-audit.test.ts` |
-| 6.4 | Data export / destructive data management | **Partial** | `admin.test.ts` asserts CSV/JSON export into a chosen folder and the permission refusal; the typed-confirmation destructive flows are exercised end to end on Windows |
+| 6.4 | Data export / destructive data management | **Done** | `admin.test.ts` (CSV/JSON export, permission refusal), `reports.test.ts` (report CSV), `operations.test.ts` (typed phrase + password + verified pre-action backup, full reset that keeps the audit trail, CSV patient import with dry run, duplicates, per-row errors and refusals) |
 
 ## 7. Interface
 

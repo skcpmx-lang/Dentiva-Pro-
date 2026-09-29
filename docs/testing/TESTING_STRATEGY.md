@@ -36,9 +36,12 @@ channel (deny cases), user/role management invariants; audit chain verification 
 backup/restore round-trip, corrupt/truncated/checksum-tampered backups rejected, pre-restore backup
 guaranteed, encrypted round-trip; attachment lifecycle (add/preview-metadata/rename/delete/export,
 malicious names, oversized files, malformed content); settings changes audited and effective; global
-search across entities with filters; notifications generation and dedupe; migrations from an empty database
-and from a v1 fixture; crash-recovery (kill during transaction leaves consistent DB); performance budgets
-with the seeded dataset.
+search across entities with filters; notifications generation and dedupe (with deduplication, read/unread and
+dismissal); the operational rules around data management (typed-phrase + password destructive actions, the
+verified pre-action backup, the full reset that keeps the audit trail, and the all-or-nothing CSV patient
+import with its per-row validation, duplicate detection, dry run and permission refusal); migrations from an
+empty database and from a v1 fixture; crash-recovery (a write that throws mid-transaction and a transaction
+abandoned by a second connection both roll back); performance budgets with the seeded dataset.
 
 **E2E (real app, Windows):** the acceptance workflow in `docs/testing/ACCEPTANCE_TEST_CHECKLIST.md`
 (install → activate → setup → login → patient → visit → chart → prescription → print/PDF → appointment →

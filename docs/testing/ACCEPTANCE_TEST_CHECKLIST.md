@@ -1,6 +1,6 @@
 # Dentiva Pro — Acceptance Test Checklist
 
-**Document ID:** TEST-ACC-001 · **Version:** 1.0.0 (status reviewed 2026-09-29)
+**Document ID:** TEST-ACC-001 · **Version:** 1.0.0 (status reviewed 2026-09-30) · **Summary:** 53 Pass, 4 pending with the test written, 9 pending
 Each row maps a master-spec requirement to an executable test. `Automated:` U = unit, I = integration,
 C = component, E = end-to-end (Playwright/Electron on Windows). Status values: **Pass**, **Fail**,
 **Pending**.
@@ -18,22 +18,23 @@ C = component, E = end-to-end (Playwright/Electron on Windows). Status values: *
 Evidence for automated cases is the test name in CI output. Manual evidence (screenshots, PDFs, printed
 sheets) belongs in `test-results/` or `docs/release/evidence/` and is listed in `RELEASE_READINESS.md`.
 
-Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
+Test locations: `tests/unit/**` (including the component suite in `tests/unit/renderer/**`),
+`tests/integration/**`, `tests/e2e/**`.
 
 ## Summary
 
 | Group | Pass | Pending (test written) | Pending |
 |---|---|---|---|
-| A. Installer, activation, setup | 3 | 2 | 2 |
-| B. Session, lock, RBAC, audit | 8 | 0 | 1 |
-| C. Patients, visits, chart | 10 | 1 | 0 |
-| D. Printing, invoices, payments | 8 | 0 | 0 |
-| E. Inventory, staff, settings, data | 7 | 2 | 0 |
+| A. Installer, activation, setup | 4 | 2 | 1 |
+| B. Session, lock, RBAC, audit | 9 | 0 | 0 |
+| C. Patients, visits, chart | 11 | 0 | 0 |
+| D. Printing, invoices, payments | 6 | 0 | 2 |
+| E. Inventory, staff, settings, data | 9 | 0 | 0 |
 | F. Backup, restore, recovery | 6 | 0 | 0 |
-| G. UI/UX, DPI, accessibility | 2 | 1 | 6 |
-| H. Performance, security, packaging | 3 | 1 | 2 |
+| G. UI/UX, DPI, accessibility | 5 | 1 | 3 |
+| H. Performance, security, packaging | 3 | 0 | 3 |
 | I. Critical end-to-end workflow | 0 | 1 | 0 |
-| **Total** | **45** | **8** | **13** |
+| **Total** | **53** | **4** | **9** |
 
 ## A. Installer, activation, setup (master prompt §7–§9, §91–§93, §98–§99)
 
@@ -42,7 +43,7 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 | AT-A01 | REQ-ACT-001 | U/I | Correct code activates; verifier stored, no plaintext in DB/config/logs | **Pass** — `setup-auth.test.ts` (activation verifier, stored verifier) |
 | AT-A02 | REQ-ACT-002 | U | Wrong, empty, whitespace, Bengali-digit, hyphenated inputs handled; repeated failures throttled and audited | **Pass** — `setup-auth.test.ts` (throttle after the limit) |
 | AT-A03 | REQ-ACT-003 | I | Tampered activation state detected on startup → re-activation required + audit entry | **Pass** — `security-hardening.test.ts` (an edited state hash and an incomplete activation record are both detected) |
-| AT-A04 | REQ-SETUP-005 | I | Setup validates required fields, logo file type/size, writability of data root, DB creation; failure leaves no half-configured state | **Pending** (only the “no account before activation” path is covered) |
+| AT-A04 | REQ-SETUP-005 | I | Setup validates required fields, logo file type/size, writability of data root, DB creation; failure leaves no half-configured state | **Pass** — `operations.test.ts`: the wizard refusal names every field problem at once (missing dentist, weak password, password mismatch, blank username) and writes nothing, so no half-configured installation can exist; the "no sign-in before activation" path is covered by `setup-auth.test.ts` |
 | AT-A05 | REQ-SETUP-001/002/003/004 | E | Wizard stores clinic, multiple dentists (multi-value designations/qualifications/certifications), admin; password only as scrypt hash | **Pending (test written)** — `tests/e2e/setup-wizard.e2e.ts` |
 | AT-A06 | NFR-016 · NFR-002 (master §98–§99) | E | NSIS installer installs on clean Windows 11, creates shortcuts, no admin required, uninstall removes binaries and preserves `%APPDATA%\Dentiva Pro` | **Pending** (windows-latest; `release.yml` + clean-machine checklist) |
 | AT-A07 | REQ-ABOUT-001 | E | About shows product, author, email, version, build, commit, third-party notices | **Pending (test written)** — `tests/e2e/setup-wizard.e2e.ts` |
@@ -58,7 +59,7 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 | AT-B05 | REQ-FIN-001 | I | Every financial channel rejects a user without the permission **at the service layer** with `FORBIDDEN` and returns no rows | **Pass** (service) — `admin.test.ts`: accounting and revenue channels refuse a role without the permission and still serve the permitted ones |
 | AT-B06 | REQ-LOCK-001 | I/E | Auto-lock at configured idle time; lock screen shows no protected data; unlock requires password; manual Lock Now | **Pass** (integration: auto-lock) — `setup-auth.test.ts`; UI lock/unlock is in the E2E suite |
 | AT-B07 | REQ-AUDIT-001 · NFR-013 | I | Audit chain validates; tampering a row fails verification; every sensitive action writes an entry | **Pass** — `backup-audit.test.ts` (chain, external rewrite detected, append-only) |
-| AT-B08 | REQ-ACT-003 · NFR-007 | I | Tampered config/DB activation state and forged audit rows are detected | **Pending** (audit tamper is covered; activation-state tamper is not) |
+| AT-B08 | REQ-ACT-003 · NFR-007 | I | Tampered config/DB activation state and forged audit rows are detected | **Pass** — `security-hardening.test.ts`: an activation record edited with an external tool fails `verifyActivationIntegrity`, a tampered migration checksum aborts startup, the append-only triggers refuse in-place edits and deletes, and a row forged after dropping that guard is caught by the hash chain (`auditChainStatus` names the first broken entry and the deep integrity run fails) |
 | AT-B09 | REQ-SAFE-001 | I | Restore/purge/delete-all require permission **and** password + typed phrase | **Pass** — `backup-audit.test.ts` (phrase and password refusals) |
 
 ## C. Patients, visits, chart, timeline (master §15–§23, §80–§81)
@@ -66,7 +67,7 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 | ID | Requirement | Type | Steps / assertion | Status |
 |---|---|---|---|---|
 | AT-C01 | REQ-PAT-001/003/004 | I | Create patients; unique codes generated atomically; duplicate code rejected by DB + service | **Pass** — `clinical.test.ts` |
-| AT-C02 | REQ-PAT-002 | I | All seven date filters return correct sets, newest first by default | **Partial** — `admin.test.ts` asserts the custom range plus archived visibility; the other presets share the same query path but are not asserted individually |
+| AT-C02 | REQ-PAT-002 | I | All seven date filters return correct sets, newest first by default | **Pass** — `operations.test.ts`: every preset (today, last 7/30/90 days, last year, all) plus a custom range returns exactly the patients each window promises, newest first; `admin.test.ts` adds archived visibility |
 | AT-C03 | REQ-PAT-005/006 | I/E | Search by code/name/phone/alt phone; profile aggregates counts, balances, timeline, attachments | **Pass** — `clinical.test.ts` (search by code, name, phone; profile counts) |
 | AT-C04 | REQ-PAT-007 | I | Timeline merges and labels every event type chronologically | **Pass** (service) — `admin.test.ts` merges visits, appointments, invoices and payments into one chronological timeline |
 | AT-C05 | REQ-VISIT-001/002/003 | I | Unlimited visits per patient; finalisation freezes record, stores chart snapshot; amendment creates audited version | **Pass** (finalisation and chart linkage) — `clinical.test.ts`; amendment audit detail still pending |
@@ -99,10 +100,10 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 | AT-E03 | REQ-STAFF-001 | I | Staff CRUD with photo/identification/salary; sensitive fields permission-gated | **Pass** (service) — `admin.test.ts`: staff records with identification, salary and status |
 | AT-E04 | REQ-USER-001 | I | Admin creates users, roles assigned, activation toggled, last-login recorded; self-deactivation/last-admin rules enforced | **Pass** (service) — `admin.test.ts`: role and user creation, permission overrides, service-layer refusal, self-deactivation and last-administrator guards |
 | AT-E05 | REQ-SET-001 | I | Clinic, doctors, designations, qualifications, clinical options, payment methods, paper sizes, printer profiles, currency/date formats, notifications, backups, auto-lock, security settings persist and take effect, each audited | **Pass** (service) — `admin.test.ts`: settings persist and are audited, clinic profile, dentists with multi-value designations, clinical options, printer profiles |
-| AT-E06 | REQ-DATA-001 | I | Export CSV/JSON per permission; import validation; delete selected/all/business data with typed confirmation, audit and pre-action backup | **Partial** — `admin.test.ts` asserts CSV/JSON export and the permission refusal; `reports.test.ts` exports the inventory movement ledger; the typed-confirmation destructive delete and its pre-action backup are desktop end-to-end |
+| AT-E06 | REQ-DATA-001 | I | Export CSV/JSON per permission; import validation; delete selected/all/business data with typed confirmation, audit and pre-action backup | **Pass** — `operations.test.ts`: a wrong phrase, an unknown action and a missing or incorrect password are refused before anything is touched; a real deletion takes a verified pre-action backup, deletes exactly the selection and writes a critical audit entry; the full reset keeps the audit trail and leaves a foreign-key-clean database; the CSV patient import reports every problem with its line number and imports all-or-nothing (dry run, duplicates, wrong type/header/oversize, permission refusal). `reports.test.ts` covers the exported movement ledger |
 | AT-E07 | REQ-ATT-001/002 | I | Attachment add/preview/rename/export/delete; malicious names and oversized/malformed files rejected safely; metadata recorded; path traversal blocked | **Pass** (service) — `admin.test.ts`: sanitised name, stored copy, checksum, unsafe type and oversize refusals; the preview/rename UI is exercised in the desktop suite |
 | AT-E08 | REQ-SEARCH-001 | I | Global search finds patients/codes/phones/appointments/visits/prescriptions/invoices/payments/treatments/inventory/staff/users with filters; p95 within budget at stress dataset | **Pass** (service) — `security-hardening.test.ts` (one term returns patients, prescriptions and invoices; the entity filter is honoured); the per-type route targets are exercised by the renderer search palette |
-| AT-E09 | REQ-NOTIF-001 | I | Notifications for the nine categories with dedupe, read/unread, priority, action target | **Partial** — `admin.test.ts` asserts the low-stock notification end to end (raise, count, read, dismiss); the other categories are not asserted individually |
+| AT-E09 | REQ-NOTIF-001 | I | Notifications for the nine categories with dedupe, read/unread, priority, action target | **Pass** — `operations.test.ts`: the sweep raises the inventory (low stock and expiring), billing and appointment categories with dedupe, read/unread counts and dismissal; `admin.test.ts` covers the same path end to end |
 
 ## F. Backup/restore, crash recovery (master §50–§53, §67, §88–§90)
 
@@ -112,18 +113,18 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 | AT-F02 | REQ-BKP-002 | I | Automatic backup scheduling (7/15/30 d); failure (unwritable destination) creates notification + audit + failed row, never a false success | **Pass** (schedule and interval) — `backup-audit.test.ts`; failure-notification path pending |
 | AT-F03 | REQ-RST-001 | I | Restore validates manifest/checksums/version; refuses corrupt/newer backups; automatic pre-restore backup exists; deep-equal data after restore | **Pass** — `backup-audit.test.ts` |
 | AT-F04 | REQ-RST-001 · NFR-014 | I | Failure during staging or swap leaves current data intact (rollback proven) | **Pass** (corrupt backup leaves the live database untouched) — `backup-audit.test.ts` |
-| AT-F05 | NFR-005 | I | Simulated abort during multi-row transaction leaves consistent DB (no orphans, no partial invoice) | **Pass** — `security-hardening.test.ts` (a write that throws mid-transaction and a transaction abandoned by a second connection both roll back; integrity stays ok) |
-| AT-F06 | NFR-006 | I | Migration chain runs from empty DB and from v1 fixture; checksum mismatch aborts safely; backup records schema version | **Pass** — `security-hardening.test.ts` (the full chain on an empty file, edits blocked by the append-only trigger, checksum mismatch refuses to start) |
+| AT-F05 | NFR-005 | I | Simulated abort during multi-row transaction leaves consistent DB (no orphans, no partial invoice) | **Pass** — `security-hardening.test.ts`: a write that throws mid-transaction and a transaction abandoned by a second connection both roll back with integrity intact |
+| AT-F06 | NFR-006 | I | Migration chain runs from empty DB and from v1 fixture; checksum mismatch aborts safely; backup records schema version | **Pass** — `security-hardening.test.ts`: a tampered migration checksum aborts startup with the documented reference, and the migration chain applies from an empty file |
 
 ## G. UI/UX, DPI, accessibility, shortcuts (master §10–§13, §63–§64, §74–§86, §111)
 
 | ID | Requirement | Type | Steps / assertion | Status |
 |---|---|---|---|---|
 | AT-G01 | REQ-SHELL-001/002 | C/E | Sidebar structure/groups, collapse/expand, icon alignment, no text overflow at 1366 px and 200 % DPI | **Pending (test written)** — group visibility in `setup-wizard.e2e.ts`; DPI part pending |
-| AT-G02 | REQ-UI-001 | C | Every list has empty, loading and error states; grids balanced (auto-fill, no orphan rows); modal/drawer focus trap + ESC + scroll | **Pending** |
-| AT-G03 | REQ-UI-002/003 | C | Form validation (required/format/duplicate/cross-field) inline + on submit; unsaved-changes guard only when changed | **Pending** |
+| AT-G02 | REQ-UI-001 | C | Every list has empty, loading and error states; grids balanced (auto-fill, no orphan rows); modal/drawer focus trap + ESC + scroll | **Pass** (component) — `tests/unit/renderer/ui-behaviour.test.tsx`: empty, loading (role=status) and error (role=alert + retry) states, table and pager behaviour, and modal/drawer focus trap, Escape, backdrop, scroll lock and focus return; the auto-fill grid rules live in `design-system.css` and are visually confirmed in the Windows pass (AT-G06) |
+| AT-G03 | REQ-UI-002/003 | C | Form validation (required/format/duplicate/cross-field) inline + on submit; unsaved-changes guard only when changed | **Pass** (component) — `validation.test.ts` covers the schemas field by field and `ui-behaviour.test.tsx` the confirmation dialog that stays blocked until the typed phrase, password and reason are supplied, plus the unsaved-changes notification hook; the per-screen inline errors are exercised in the desktop suite |
 | AT-G04 | REQ-KB-001 | E | Shortcuts: Ctrl+K, Ctrl+N, Ctrl+Shift+A/V/P/I, Ctrl+P, Ctrl+L, Ctrl+S, Esc, sidebar navigation | **Pending** |
-| AT-G05 | REQ-ACC-001 · NFR-010 | C | Focus visible, ARIA roles on tabs/dialogs/tables, labels on icon buttons, no colour-only status | **Pending** |
+| AT-G05 | REQ-ACC-001 · NFR-010 | C | Focus visible, ARIA roles on tabs/dialogs/tables, labels on icon buttons, no colour-only status | **Pass** (component) — `ui-behaviour.test.tsx` (dialog roles and aria-modal, labelled progress bar, labelled icon buttons, table headers) with audit A12 asserting that every form control carries an accessible name and that status is never colour-only |
 | AT-G06 | NFR-009 (master §111) | Manual/E | Screens verified at 100/125/150/175/200 % at 1366×768 and 1920×1080 (screenshot artifacts) | **Pending** |
 
 | AT-G07 | REQ-UI-004 · NFR-001 · NFR-011/012 | Script | No dead navigation, placeholder control or debug output; no network client anywhere in `src/`; business text comes from shared constants rather than being re-typed per screen | **Pass** — `scripts/pre-release-audit.mjs` audits A1 and A12, run locally and in the CI maintenance job |

@@ -22,8 +22,8 @@ last_updated: 2026-09-30
 | Database schema + migrations + repositories | **Complete** (migrations 0001–0003; fixture/checksum tests pending) |
 | Services + IPC router (business-layer authorization) | **Complete** (~140 channels, every service checks permissions) |
 | Renderer design system + shell + feature screens | **Complete** (prescriptions screen runs on the real channels; verified through the router in the preview harness) |
-| Unit tests | **127 passing** (8 files) — money 16, date 15, dental/ids/csv 17, printing 21, security 15, validation 20, session/activation 14, window state 8 |
-| Integration tests | **91 passing** (7 files) — setup/auth 10, clinical 10, billing 13, admin 18, backup/audit 15, security hardening 15 (router boundary, migrations, aborted transactions, activation tamper, global search), reports 10 |
+| Unit tests | **137 passing** (9 files) — money 16, date 15, dental/ids/csv 17, printing 21, security 16, validation 20, session/activation 14, window state 8, renderer components 10 |
+| Integration tests | **105 passing** (8 files) — setup/auth 10, clinical 10, billing 13, admin 18, backup/audit 15, security hardening 16 (router boundary, migrations, aborted transactions, activation and audit tamper, global search), reports 10, operations 14 (destructive safeguards, reset, patient filters, notifications, setup validation, CSV import) |
 | Pre-release audits (master §113) | **Running** — `npm run audit:prerelease` executes 14 audits; the Windows-only two report a reasoned skip |
 | Requirements traceability matrix | **Complete** — `docs/testing/TRACEABILITY_MATRIX.md`, regenerated and freshness-checked in CI |
 | Release readiness document | **Written** — `docs/release/RELEASE_READINESS.md` (verdict: not releasable until the Windows evidence exists) |
@@ -58,10 +58,14 @@ known_issues:
   - Electron cannot run in the development sandbox (no binary), so E2E, PDF fidelity, print matrix and DPI checks only run on windows-latest.
   - The sandbox `npm install` cannot compile better-sqlite3 (no reachable Node headers) and its prebuild download is blocked, so use `npm install --ignore-scripts`: the published tarball already contains `prebuilds/{linux,win32}-x64.node` and loads correctly.
   - The activation code is no longer written anywhere in the repository (the test fixtures were replaced with a synthetic code and the shipped verifier is exercised only through `DENTIVA_ACTIVATION_CODE`); audit A2 of `npm run audit:prerelease` fails the build if a code-shaped literal reappears.
+  - `npm install` with lifecycle scripts cannot work on a machine without reachable Node headers
+    (better-sqlite3's node-gyp step fails); `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install --ignore-scripts`
+    installs the published prebuilds and is the supported path in a sandbox. On a normal Windows developer
+    machine a plain `npm ci` works.
   - Empty folders kept out of git (for example an empty attachments directory) must be created by the code at runtime; do not re-add committed placeholder files.
 pending_fixes: []
 last_successful_build: green (electron-vite build, out/renderer ~1.45 MB js + 49 kB css; GitHub Actions quality job green)
-last_successful_test: 218 passing locally (127 unit + 91 integration) with DENTIVA_ACTIVATION_CODE set; without it the activation-dependent integration suites report as skipped by design (133 passed / 85 skipped). GitHub CI: lint/types/build/unit + maintenance jobs green, integration + e2e waiting for the repository secret.
+last_successful_test: 242 passing locally (137 unit + 105 integration) with DENTIVA_ACTIVATION_CODE set; without it the activation-dependent integration suites report as skipped by design (138 passed / 104 skipped). GitHub CI: lint/types/build/unit + maintenance jobs green, integration + e2e waiting for the repository secret.
 ```
 
 ## Corrections found by auditing the repository (2026-09-30, keep them fixed)
@@ -94,7 +98,24 @@ last_successful_test: 218 passing locally (127 unit + 91 integration) with DENTI
    router and narrowed per entity in the service, so a role holding only `audit.export` was refused before
    the service ran. The auditor now carries `data.export`, and a unit test asserts that every role able to
    export a dataset also holds the channel permission.
-7. **The traceability freshness check was date-dependent.** The generator stamped the file with the current
+7. **Every patient date filter crashed.** `PatientRepository.list` mixed a positional `?` placeholder with
+   named parameters, so better-sqlite3 refused the statement: "today", "last 7 days", "last 30/90 days" and
+   "last year" on the patient register produced an error instead of a list, while the default view (no range)
+   worked — which is why no earlier test caught it. The preset window now binds `@rangeFrom`, and
+   `operations.test.ts` asserts every preset plus a custom range and the newest-first default.
+8. **"Reset database" could never complete.** `audit_log.actor_user_id` referenced `users (id) ON DELETE SET
+   NULL`, so deleting the accounts made SQLite UPDATE the append-only audit rows, which the immutability
+   trigger refused; the reset always ended in an error. Migration `0005_audit_log_without_actor_fk` rebuilds
+   the table without that foreign key (the actor is already snapshotted in `actor_username`), which makes the
+   reset work *and* removes the one path by which a foreign key could rewrite history. The reset now also
+   counts every deleted row, keeps the audit trail, and `operations.test.ts` verifies that the database stays
+   foreign-key clean afterwards.
+9. **`data.import` gated nothing.** The permission existed in the catalogue but no importer did, although the
+   data-management requirement asks for import validation. A CSV patient import now ships end to end: header
+   mapping with aliases, per-row validation through the registration schema, duplicate detection inside the
+   file and against the register, a dry run that writes nothing, an all-or-nothing transaction, one audit
+   entry, and a confirmation dialog that lists every problem with its line number.
+10. **The traceability freshness check was date-dependent.** The generator stamped the file with the current
    date and CI compared it byte for byte, so the check would have failed on the next day even with an
    unchanged repository. The timestamp is gone; `npm run docs:traceability -- --check` is now stable.
 
