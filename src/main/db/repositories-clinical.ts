@@ -103,7 +103,9 @@ export class PatientRepository {
       where.push('p.is_active = 1')
     }
     if (query.range && query.range !== 'all' && query.range !== 'custom') {
-      where.push(`date(p.created_at) >= date(?)`)
+      // Named parameters throughout: a bare `?` placeholder alongside named ones makes better-sqlite3
+      // refuse the statement, which broke every preset filter on the patient register.
+      where.push('date(p.created_at) >= date(@rangeFrom)')
       params.rangeFrom = rangeStart(query.range)
     }
     if (query.range === 'custom' && query.from && query.to) {
