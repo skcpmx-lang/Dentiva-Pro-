@@ -1576,7 +1576,9 @@ export class AdminService {
 
   private purgeEverything(): number {
     const db = this.deps.db
-    const affected = this.purgeBusinessData()
+    // Every row the reset removes is counted, business data and accounts alike, so the confirmation
+    // summary and the audit entry report what actually happened.
+    let affected = this.purgeBusinessData()
     const tables = [
       'user_permissions',
       'login_attempts',
@@ -1602,9 +1604,9 @@ export class AdminService {
       'backups'
     ]
     for (const table of tables) {
-      db.prepare(`DELETE FROM ${table}`).run()
+      affected += db.prepare(`DELETE FROM ${table}`).run().changes
     }
-    db.prepare("DELETE FROM app_meta WHERE key NOT IN ('data_schema_version')").run()
+    affected += db.prepare("DELETE FROM app_meta WHERE key NOT IN ('data_schema_version')").run().changes
     return affected
   }
 

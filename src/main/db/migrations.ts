@@ -852,11 +852,75 @@ ALTER TABLE prescriptions ADD COLUMN voided_at TEXT;
 CREATE INDEX idx_prescriptions_status ON prescriptions (status);
 `
 
+const MIGRATION_0005 = `
+-- ============================================================================================
+-- 0005_audit_log_without_actor_fk — history can no longer be rewritten by a foreign key
+-- ============================================================================================
+--
+-- audit_log.actor_user_id referenced users (id) ON DELETE SET NULL. Deleting a user (the
+-- "reset database" destructive action does exactly that) made SQLite issue an UPDATE against the
+-- audit rows, which the append-only trigger refused — so the reset could never complete, and the
+-- immutability guard was answerable to a foreign key. The actor is already snapshotted in
+-- actor_username, so the trail keeps its meaning without the constraint; the identifier is kept
+-- for reporting but no longer linked.
+
+DROP TRIGGER IF EXISTS trg_audit_no_update;
+DROP TRIGGER IF EXISTS trg_audit_no_delete;
+
+CREATE TABLE audit_log_rebuilt (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  at              TEXT NOT NULL,
+  at_epoch_ms     INTEGER NOT NULL,
+  actor_user_id   INTEGER,
+  actor_username  TEXT,
+  action          TEXT NOT NULL,
+  entity_type     TEXT,
+  entity_id       TEXT,
+  summary         TEXT NOT NULL,
+  before_json     TEXT,
+  after_json      TEXT,
+  severity        TEXT NOT NULL DEFAULT 'info' CHECK (severity IN ('info', 'warning', 'critical')),
+  app_version     TEXT NOT NULL,
+  hash            TEXT NOT NULL,
+  prev_hash       TEXT
+);
+
+INSERT INTO audit_log_rebuilt (
+  id, at, at_epoch_ms, actor_user_id, actor_username, action, entity_type, entity_id,
+  summary, before_json, after_json, severity, app_version, hash, prev_hash
+)
+SELECT
+  id, at, at_epoch_ms, actor_user_id, actor_username, action, entity_type, entity_id,
+  summary, before_json, after_json, severity, app_version, hash, prev_hash
+FROM audit_log;
+
+DROP TABLE audit_log;
+ALTER TABLE audit_log_rebuilt RENAME TO audit_log;
+
+CREATE TRIGGER trg_audit_no_update
+BEFORE UPDATE ON audit_log
+BEGIN
+  SELECT RAISE(ABORT, 'audit_log is append-only: updates are not permitted');
+END;
+
+CREATE TRIGGER trg_audit_no_delete
+BEFORE DELETE ON audit_log
+BEGIN
+  SELECT RAISE(ABORT, 'audit_log is append-only: deletes are not permitted');
+END;
+
+CREATE INDEX idx_audit_at     ON audit_log (at_epoch_ms DESC, id DESC);
+CREATE INDEX idx_audit_entity ON audit_log (entity_type, entity_id);
+CREATE INDEX idx_audit_action ON audit_log (action, at_epoch_ms DESC);
+CREATE INDEX idx_audit_actor  ON audit_log (actor_user_id, at_epoch_ms DESC);
+`
+
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: '0001_initial_schema', sql: MIGRATION_0001 },
   { version: 2, name: '0002_indexes', sql: MIGRATION_0002 },
   { version: 3, name: '0003_audit_immutability', sql: MIGRATION_0003 },
-  { version: 4, name: '0004_prescription_void_reason', sql: MIGRATION_0004 }
+  { version: 4, name: '0004_prescription_void_reason', sql: MIGRATION_0004 },
+  { version: 5, name: '0005_audit_log_without_actor_fk', sql: MIGRATION_0005 }
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? 0
