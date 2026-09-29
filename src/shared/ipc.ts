@@ -441,6 +441,7 @@ export interface IpcChannelMap {
   'patients.create': { payload: PatientInput; result: Patient }
   'patients.update': { payload: { id: number; input: PatientInput }; result: Patient }
   'patients.archive': { payload: IdPayload; result: { ok: true } }
+  'patients.restore': { payload: IdPayload; result: { ok: true } }
   'patients.timeline': { payload: PatientTimelinePayload; result: PatientTimelineEntry[] }
   'patients.addNote': { payload: PatientNotePayload; result: { ok: true } }
   'patients.financialSummary': { payload: IdPayload; result: PatientFinancialSummary }

@@ -212,9 +212,30 @@ export function normalizeDigits(input: string): string {
 }
 
 /**
- * Tolerant parser for user-entered amounts: accepts "1,250", "৳1250.5", "12.5k" is NOT accepted,
- * Bengali digits are transliterated, surrounding spaces and currency symbols are ignored.
- * Returns null when the input is not a valid non-negative amount with at most 2 decimals.
+ * Decimal-exact conversion of a *string* amount ("1250.75", "-4", ".5") into integer poisha.
+ *
+ * This is the conversion the user interface uses: a typed amount never passes through a binary floating
+ * point value, so "0.29" always becomes 29 poisha and no amount can drift by one poisha. Returns null when
+ * the text is not a plain decimal with at most two fraction digits.
+ */
+export function fromDecimalString(value: string): number | null {
+  if (typeof value !== 'string') return null
+  const match = /^(-?)(\d*)(?:\.(\d{0,2}))?$/.exec(value)
+  if (!match) return null
+  const [, sign = '', wholeRaw = '', fractionRaw = ''] = match
+  if (wholeRaw === '' && fractionRaw === '') return null
+  const whole = wholeRaw === '' ? 0 : Number(wholeRaw)
+  const fraction = fractionRaw === '' ? 0 : Number(fractionRaw.padEnd(2, '0'))
+  if (!Number.isSafeInteger(whole)) return null
+  const poisha = whole * POISHA_PER_TAKA + fraction
+  if (!Number.isSafeInteger(poisha)) return null
+  return sign === '-' ? -poisha : poisha
+}
+
+/**
+ * Tolerant parser for user-entered amounts: accepts "1,250", "৳1250.5" (and Bengali digits), rejects
+ * "12.5k" and any amount with more than two decimals. Surrounding spaces and currency symbols are ignored.
+ * Returns null when the input is not a valid amount.
  */
 export function parseAmount(input: string): number | null {
   if (typeof input !== 'string') return null
@@ -222,11 +243,7 @@ export function parseAmount(input: string): number | null {
     .replace(/[\s,\u09F3৳]/g, '')
     .replace(/^\+/, '')
   if (cleaned === '') return null
-  if (!/^-?\d*(\.\d{0,2})?$/.test(cleaned)) return null
-  if (/^-?\.$/.test(cleaned) || cleaned === '-' || cleaned === '-.') return null
-  const value = Number(cleaned)
-  if (!Number.isFinite(value)) return null
-  return fromTaka(value)
+  return fromDecimalString(cleaned)
 }
 
 /** Validate that a value is a usable amount (integer poisha, within range). */

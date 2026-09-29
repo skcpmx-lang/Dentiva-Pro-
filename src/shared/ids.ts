@@ -67,7 +67,9 @@ export function sanitizeFileName(input: string, fallback = 'file'): string {
   if (name === '' || name === '.' || name === '..') return fallback
   const dotIndex = name.lastIndexOf('.')
   const base = dotIndex > 0 ? name.slice(0, dotIndex) : name
-  const extension = dotIndex > 0 ? name.slice(dotIndex).toLowerCase().slice(0, 12) : ''
+  // A dot at the very end is not an extension: Windows would silently drop it.
+  const extension =
+    dotIndex > 0 && dotIndex < name.length - 1 ? name.slice(dotIndex).toLowerCase().slice(0, 12) : ''
   const safeBase = WINDOWS_RESERVED_NAMES.has(base.toUpperCase())
     ? `${base}_file`
     : base.replace(/[. ]+$/g, '')

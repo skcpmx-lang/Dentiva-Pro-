@@ -684,7 +684,7 @@ export const patientQuerySchema = pageQuerySchema.extend({
   from: isoDateSchema.nullable().optional(),
   to: isoDateSchema.nullable().optional(),
   gender: z.enum(GENDERS).nullable().optional(),
-  includeInactive: z.boolean().default(false)
+  includeArchived: z.boolean().default(false)
 })
 
 export const appointmentQuerySchema = pageQuerySchema.extend({
@@ -827,6 +827,7 @@ export const patientListSchema = patientQuerySchema.extend({
   includeArchived: z.boolean().optional()
 })
 export const patientArchiveSchema = idPayloadSchema
+export const patientRestoreSchema = idPayloadSchema
 export const patientTimelineSchema = z.object({ patientId: idSchema })
 export const patientNoteSchema = z.object({
   patientId: idSchema,

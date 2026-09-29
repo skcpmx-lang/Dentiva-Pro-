@@ -230,6 +230,8 @@ export interface PatientSummary {
   address: string | null
   chiefComplaint: string | null
   isActive: boolean
+  /** Archived (soft-deleted) patients stay readable and can be restored. */
+  isArchived: boolean
   createdAt: string
   lastVisitDate: string | null
   outstandingPoisha: number
@@ -573,6 +575,8 @@ export interface Prescription {
 }
 
 export interface PrescriptionInput {
+  /** Drafts stay editable; a final prescription is the version that is printed and given to the patient. */
+  status?: 'draft' | 'final'
   patientId: number
   visitId?: number | null
   dentistId: number
@@ -1091,7 +1095,7 @@ export interface PatientQuery extends PageQuery {
   from?: string | null
   to?: string | null
   gender?: Gender | null
-  includeInactive?: boolean
+  includeArchived?: boolean
 }
 
 export interface AppointmentQuery extends PageQuery {
