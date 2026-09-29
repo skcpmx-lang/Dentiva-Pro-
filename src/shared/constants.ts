@@ -96,6 +96,36 @@ export type LockTimeoutMinutes = (typeof LOCK_TIMEOUT_OPTIONS)[number]
 export const BACKUP_INTERVAL_OPTIONS = [7, 15, 30] as const
 export type BackupIntervalDays = (typeof BACKUP_INTERVAL_OPTIONS)[number]
 
+/**
+ * Patient import (master §40, REQ-DATA-001). The template below is the file the clinic fills in; the
+ * service maps these labels, validates every row with the same schema the registration form uses, reports
+ * every problem with its row number and imports all-or-nothing.
+ */
+export const PATIENT_IMPORT = {
+  maxBytes: 5 * 1024 * 1024,
+  maxRows: 5000,
+  templateHeader: [
+    'Full Name',
+    'Name (Bangla)',
+    'Phone',
+    'Alternate Phone',
+    'Email',
+    'Gender',
+    'Date of Birth',
+    'Age',
+    'Blood Group',
+    'Address',
+    'City',
+    'National ID',
+    'Occupation',
+    'Guardian Name',
+    'Emergency Phone',
+    'Allergies',
+    'Medical History',
+    'Notes'
+  ]
+} as const
+
 export const ATTACHMENT_LIMITS = {
   maxSizeBytes: 25 * 1024 * 1024,
   allowedExtensions: [

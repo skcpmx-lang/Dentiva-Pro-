@@ -932,6 +932,15 @@ export const reportDataSchema = z.object({
   from: isoDateSchema,
   to: isoDateSchema
 })
+export const patientImportSchema = z.object({
+  filePath: z
+    .string()
+    .trim()
+    .min(1, 'Choose a CSV file to import.')
+    .max(1000, 'That file path is too long.')
+    .refine((value) => value.toLowerCase().endsWith('.csv'), 'Choose a .csv file.'),
+  dryRun: z.boolean()
+})
 export const reportExportSchema = z.object({
   report: z.enum(REPORT_KEYS),
   from: isoDateSchema,

@@ -38,6 +38,7 @@ import type {
   ExpenseInput,
   ExpenseQuery,
   ExportResult,
+  PatientImportResult,
   IntegrityReport,
   InventoryBatch,
   InventoryItem,
@@ -314,6 +315,10 @@ export interface ExportPayload {
   from?: string | null
   to?: string | null
   targetFolder: string
+}
+export interface PatientImportPayload {
+  filePath: string
+  dryRun: boolean
 }
 export interface ReportExportPayload {
   report: string
@@ -619,6 +624,7 @@ export interface IpcChannelMap {
   // Reports / exports / system ------------------------------------------------------------------
   'reports.data': { payload: ReportDataPayload; result: ReportDataResult }
   'reports.export': { payload: ReportExportPayload; result: ExportResult }
+  'data.import': { payload: PatientImportPayload; result: PatientImportResult }
   'print.buildReport': {
     payload: ReportPrintResultPayload
     result: import('./printing/model').ReportDocument

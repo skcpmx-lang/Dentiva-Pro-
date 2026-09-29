@@ -3,9 +3,14 @@
  * queue and the dashboard. Business rules and permission checks live here.
  */
 
-import { todayIso } from '@shared/date'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { extname, isAbsolute, resolve as resolvePath } from 'node:path'
+
+import { isValidIsoDate, todayIso } from '@shared/date'
 import { conflict, notFound, validationError } from '@shared/errors'
-import { formatSequence } from '@shared/ids'
+import { formatSequence, sanitizeFileName } from '@shared/ids'
+import { parseCsv } from '@shared/csv'
+import { patientInputSchema } from '@shared/validation'
 import type {
   AppointmentInput,
   AppointmentQuery,
@@ -14,6 +19,9 @@ import type {
   DashboardWidgetData,
   Patient,
   PatientInput,
+  PatientImportIssue,
+  PatientImportPreviewRow,
+  PatientImportResult,
   PatientProfile,
   PatientQuery,
   PatientSummary,
@@ -28,7 +36,7 @@ import type {
   VisitQuery,
   Paged
 } from '@shared/types'
-import type { AppointmentStatus, QueueStatus } from '@shared/constants'
+import { GENDERS, PATIENT_IMPORT, type AppointmentStatus, type QueueStatus } from '@shared/constants'
 import { dentitionOf } from '@shared/dental'
 import type { SqliteDatabase } from '../db/connection'
 import type {
@@ -153,6 +161,210 @@ export class ClinicalService {
     })
     const id = run()
     return this.deps.patients.findById(id) as Patient
+  }
+
+  /**
+   * Bulk patient import from a CSV file (master §40, REQ-DATA-001).
+   *
+   * The file is mapped by header label, every row is validated with the same schema the registration form
+   * uses, duplicates are detected inside the file and against the register, and the import is all-or-
+   * nothing: `dryRun` reports what would happen and writes nothing, while a real run inserts every valid
+   * row in one transaction and records one audit entry. Problems are reported per row so the clinic can
+   * fix the spreadsheet and import again.
+   */
+  importPatients(request: { filePath: string; dryRun: boolean }): PatientImportResult {
+    this.require('data.import')
+
+    if (!isAbsolute(request.filePath)) {
+      throw validationError('Choose a CSV file to import.', [
+        { field: 'filePath', message: 'An absolute file path is required.' }
+      ])
+    }
+    const filePath = resolvePath(request.filePath)
+    if (extname(filePath).toLowerCase() !== '.csv') {
+      throw validationError('Choose a .csv file to import.', [
+        { field: 'filePath', message: 'Only comma-separated files are supported.' }
+      ])
+    }
+    if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+      throw notFound('Import file', filePath)
+    }
+    const size = statSync(filePath).size
+    if (size > PATIENT_IMPORT.maxBytes) {
+      throw validationError(
+        `That file is ${(size / (1024 * 1024)).toFixed(1)} MB; the import limit is ${(
+          PATIENT_IMPORT.maxBytes /
+          (1024 * 1024)
+        ).toFixed(0)} MB.`,
+        [{ field: 'filePath', message: 'Split the file and import it in parts.' }]
+      )
+    }
+
+    const text = readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '')
+    const table = parseCsv(text).filter((row) => row.some((cell) => cell.trim() !== ''))
+    if (table.length < 2) {
+      throw validationError('The file has no patient rows.', [
+        { field: 'filePath', message: 'The file needs a header row and at least one patient row.' }
+      ])
+    }
+    if (table.length - 1 > PATIENT_IMPORT.maxRows) {
+      throw validationError(
+        `The file has ${table.length - 1} rows; the import limit is ${PATIENT_IMPORT.maxRows}.`,
+        [{ field: 'filePath', message: 'Split the file and import it in parts.' }]
+      )
+    }
+
+    const columns = mapImportHeader(table[0] as string[])
+    const missing = REQUIRED_IMPORT_FIELDS.filter((field) => columns[field] === undefined)
+    if (missing.length > 0) {
+      throw validationError('The CSV header is missing required columns.', [
+        {
+          field: 'filePath',
+          message: `Required column(s): ${missing.map((field) => IMPORT_FIELD_LABELS[field]).join(', ')}.`
+        },
+        { field: 'filePath', message: `Import template: ${PATIENT_IMPORT.templateHeader.join(', ')}` }
+      ])
+    }
+
+    const issues: PatientImportIssue[] = []
+    const preview: PatientImportPreviewRow[] = []
+    const accepted: { input: PatientInput; row: number }[] = []
+    const seen = new Set<string>()
+    let duplicates = 0
+
+    table.slice(1).forEach((cells, index) => {
+      const row = index + 2 // the header is line 1
+      const cell = (field: ImportField): string => {
+        const column = columns[field]
+        return column === undefined ? '' : (cells[column] ?? '').trim()
+      }
+
+      const fullName = cell('fullName')
+      const phone = cell('phone')
+      const genderText = cell('gender').toLowerCase()
+      const gender = normalizeGender(genderText)
+      if (genderText !== '' && gender === null) {
+        issues.push({ row, field: 'gender', message: 'Use male, female or other.', value: genderText })
+      }
+      const birth = normalizeImportDate(cell('dateOfBirth'))
+      if (birth === 'invalid') {
+        issues.push({
+          row,
+          field: 'dateOfBirth',
+          message: 'Use YYYY-MM-DD or DD/MM/YYYY.',
+          value: cell('dateOfBirth')
+        })
+      }
+      const ageText = cell('ageYears')
+      const age = ageText === '' ? null : Number(ageText)
+
+      const candidate = {
+        fullName,
+        fullNameBn: cell('fullNameBn') || null,
+        phone,
+        phoneAlt: cell('phoneAlt') || null,
+        email: cell('email') || null,
+        gender: gender ?? undefined,
+        dateOfBirth: birth === 'invalid' ? null : birth,
+        ageYears: age !== null && Number.isFinite(age) ? age : null,
+        bloodGroup: normalizeBloodGroup(cell('bloodGroup')),
+        address: cell('address') || null,
+        city: cell('city') || null,
+        nationalId: cell('nationalId') || null,
+        occupation: cell('occupation') || null,
+        guardianName: cell('guardianName') || null,
+        emergencyPhone: cell('emergencyPhone') || null,
+        allergies: cell('allergies') || null,
+        medicalHistory: cell('medicalHistory') || null,
+        notes: cell('notes') || null
+      }
+
+      const parsed = patientInputSchema.safeParse(candidate)
+      if (!parsed.success) {
+        for (const problem of parsed.error.issues.slice(0, 4)) {
+          issues.push({
+            row,
+            field: problem.path.join('.') || 'row',
+            message: problem.message,
+            value: problem.path.length > 0 ? cell(problem.path[0] as ImportField) || null : null
+          })
+        }
+        return
+      }
+
+      const duplicateKey = `${parsed.data.fullName.toLowerCase()}|${parsed.data.phone}`
+      const existing = this.deps.db
+        .prepare(
+          'SELECT id FROM patients WHERE deleted_at IS NULL AND lower(full_name) = lower(?) AND phone = ?'
+        )
+        .get(parsed.data.fullName, parsed.data.phone) as { id: number } | undefined
+      if (seen.has(duplicateKey) || existing) {
+        duplicates += 1
+        issues.push({
+          row,
+          field: 'phone',
+          message: existing ? 'Already registered with this name and phone.' : 'Repeated twice in the file.',
+          value: parsed.data.phone
+        })
+        return
+      }
+      seen.add(duplicateKey)
+      accepted.push({ input: parsed.data as PatientInput, row })
+      if (preview.length < 5) {
+        preview.push({
+          row,
+          fullName: parsed.data.fullName,
+          phone: parsed.data.phone,
+          gender: parsed.data.gender ?? null,
+          city: parsed.data.city ?? null
+        })
+      }
+    })
+
+    const result: PatientImportResult = {
+      filePath,
+      dryRun: request.dryRun,
+      totalRows: table.length - 1,
+      validRows: accepted.length,
+      duplicateRows: duplicates,
+      invalidRows: issues.length > 0 ? table.length - 1 - accepted.length - duplicates : 0,
+      imported: 0,
+      issues: issues.slice(0, 200),
+      preview
+    }
+
+    if (request.dryRun || accepted.length === 0) return result
+
+    const actor = this.deps.session.username ?? 'system'
+    const settings = this.deps.settings.get()
+    const run = this.deps.db.transaction(() => {
+      for (const entry of accepted) {
+        const next = this.deps.counters.next('patient_code')
+        const code = formatSequence(next, {
+          prefix: settings.patientCodePrefix,
+          padding: settings.patientCodePadding
+        })
+        this.deps.patients.create(code, entry.input, actor)
+      }
+      return accepted.length
+    })
+    result.imported = run()
+    this.audit(
+      'data.import',
+      `Imported ${result.imported} patient(s) from ${sanitizeFileName(filePath)} (${result.duplicateRows} duplicate(s), ${result.invalidRows} invalid row(s) skipped)`,
+      {
+        entityType: 'import',
+        entityId: null,
+        after: {
+          file: sanitizeFileName(filePath),
+          total: result.totalRows,
+          imported: result.imported,
+          duplicates: result.duplicateRows,
+          invalid: result.invalidRows
+        }
+      }
+    )
+    return result
   }
 
   updatePatient(id: number, input: PatientInput): Patient {
@@ -1296,4 +1508,120 @@ export class ClinicalService {
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Patient import helpers
+// ---------------------------------------------------------------------------------------------
+
+type ImportField =
+  | 'fullName'
+  | 'fullNameBn'
+  | 'phone'
+  | 'phoneAlt'
+  | 'email'
+  | 'gender'
+  | 'dateOfBirth'
+  | 'ageYears'
+  | 'bloodGroup'
+  | 'address'
+  | 'city'
+  | 'nationalId'
+  | 'occupation'
+  | 'guardianName'
+  | 'emergencyPhone'
+  | 'allergies'
+  | 'medicalHistory'
+  | 'notes'
+
+const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
+  fullName: 'Full Name',
+  fullNameBn: 'Name (Bangla)',
+  phone: 'Phone',
+  phoneAlt: 'Alternate Phone',
+  email: 'Email',
+  gender: 'Gender',
+  dateOfBirth: 'Date of Birth',
+  ageYears: 'Age',
+  bloodGroup: 'Blood Group',
+  address: 'Address',
+  city: 'City',
+  nationalId: 'National ID',
+  occupation: 'Occupation',
+  guardianName: 'Guardian Name',
+  emergencyPhone: 'Emergency Phone',
+  allergies: 'Allergies',
+  medicalHistory: 'Medical History',
+  notes: 'Notes'
+}
+
+const IMPORT_FIELD_ALIASES: Record<ImportField, string[]> = {
+  fullName: ['fullname', 'name', 'patientname', 'patient'],
+  fullNameBn: ['namebangla', 'banglaname', 'namebn', 'fullnamebn', 'নাম'],
+  phone: ['phone', 'mobile', 'phonenumber', 'contact', 'contactnumber', 'mobilenumber'],
+  phoneAlt: ['alternatephone', 'phonealt', 'secondphone', 'otherphone', 'alternatemobile'],
+  email: ['email', 'emailaddress'],
+  gender: ['gender', 'sex'],
+  dateOfBirth: ['dateofbirth', 'dob', 'birthdate', 'birthday'],
+  ageYears: ['age', 'ageyears'],
+  bloodGroup: ['bloodgroup', 'blood'],
+  address: ['address', 'fulladdress'],
+  city: ['city', 'district', 'town'],
+  nationalId: ['nationalid', 'nid', 'idnumber'],
+  occupation: ['occupation', 'profession'],
+  guardianName: ['guardian', 'guardianname'],
+  emergencyPhone: ['emergencyphone', 'emergencycontact', 'emergencynumber'],
+  allergies: ['allergies', 'allergy'],
+  medicalHistory: ['medicalhistory', 'medicalconditions'],
+  notes: ['notes', 'note', 'remarks', 'comment']
+}
+
+const REQUIRED_IMPORT_FIELDS: ImportField[] = ['fullName', 'phone']
+
+const normalizeHeader = (value: string): string => value.toLowerCase().replace(/[^a-z0-9\u0980-\u09FF]/g, '')
+
+function mapImportHeader(header: string[]): Partial<Record<ImportField, number>> {
+  const normalized = header.map(normalizeHeader)
+  const mapping: Partial<Record<ImportField, number>> = {}
+  for (const [field, aliases] of Object.entries(IMPORT_FIELD_ALIASES) as [ImportField, string[]][]) {
+    const index = normalized.findIndex((label) => aliases.includes(label))
+    if (index >= 0) mapping[field] = index
+  }
+  // A column named exactly like the canonical field is accepted too (the exported file round-trips).
+  for (const field of Object.keys(IMPORT_FIELD_LABELS) as ImportField[]) {
+    if (mapping[field] === undefined) {
+      const index = normalized.indexOf(normalizeHeader(field))
+      if (index >= 0 && normalized.indexOf(normalizeHeader(IMPORT_FIELD_LABELS[field])) === -1) {
+        mapping[field] = index
+      }
+    }
+  }
+  return mapping
+}
+
+function normalizeGender(value: string): (typeof GENDERS)[number] | null {
+  if (value === '') return null
+  if (value === 'm' || value === 'male') return 'male'
+  if (value === 'f' || value === 'female') return 'female'
+  if (value === 'other' || value === 'o') return 'other'
+  return null
+}
+
+function normalizeBloodGroup(value: string): string | null {
+  const text = value.trim().toUpperCase().replace(/\s+/g, '')
+  return text === '' ? null : text
+}
+
+/** Accepts the ISO form and the day-first form a Bangladeshi spreadsheet usually contains. */
+function normalizeImportDate(value: string): string | null | 'invalid' {
+  const text = value.trim()
+  if (text === '') return null
+  if (isValidIsoDate(text)) return text
+  const match = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(text)
+  if (match) {
+    const [, day, month, year] = match as unknown as [string, string, string, string]
+    const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    if (isValidIsoDate(iso)) return iso
+  }
+  return 'invalid'
 }

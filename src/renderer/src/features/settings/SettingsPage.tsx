@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Database,
   FileDown,
+  FileUp,
   Image as ImageIcon,
   Printer,
   RefreshCw,
@@ -25,6 +26,7 @@ import type {
   ClinicProfile,
   DestructiveRequest,
   IntegrityReport,
+  PatientImportResult,
   PrinterInfo,
   PrinterProfile
 } from '@shared/types'
@@ -39,6 +41,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  Modal,
   MoneyInput,
   PageHeader,
   SegmentedControl,
@@ -50,6 +53,7 @@ import {
 } from '../../components/ui'
 import { useAction, useQuery } from '../../lib/hooks'
 import { amountInput, filesize, money, parseMoneyInput, titleCase, todayIso } from '../../lib/format'
+import { PATIENT_IMPORT } from '@shared/constants'
 import { PAPER_SIZE_KEYS } from '@shared/printing/paper'
 import { addDaysIso } from '@shared/date'
 
@@ -85,7 +89,8 @@ export function SettingsPage() {
   const [draft, setDraft] = useState<AppSettingsShape | null>(null)
   const snapshot = useQuery('settings.snapshot', undefined)
   const [integrity, setIntegrity] = useState<IntegrityReport | null>(null)
-  const [busy, setBusy] = useState<'integrity' | 'export' | null>(null)
+  const [busy, setBusy] = useState<'integrity' | 'export' | 'import' | null>(null)
+  const [importDraft, setImportDraft] = useState<PatientImportResult | null>(null)
 
   const saveSettings = useAction(async (patch: Partial<AppSettingsShape>) =>
     invoke('settings.update', { patch })
@@ -653,6 +658,137 @@ export function SettingsPage() {
               text opens correctly in Excel.
             </p>
           </Card>
+
+          <Card title="Import">
+            <div className="toolbar">
+              <Button
+                loading={busy === 'import'}
+                onClick={async () => {
+                  if (!app.hasPermission('data.import')) {
+                    app.toast({
+                      tone: 'warning',
+                      title: 'Import not allowed',
+                      detail: 'Your role cannot import patient data.'
+                    })
+                    return
+                  }
+                  setBusy('import')
+                  try {
+                    const [file] = await invoke('system.openDialog', {
+                      title: 'Choose the patient list to import',
+                      multiple: false,
+                      filters: [{ name: 'Comma-separated values', extensions: ['csv'] }]
+                    })
+                    if (!file) return
+                    // The first pass is always a dry run: nothing is written until the user confirms.
+                    setImportDraft(await invoke('data.import', { filePath: file, dryRun: true }))
+                  } catch (cause) {
+                    app.toast({
+                      tone: 'error',
+                      title: 'Could not read that file',
+                      detail: cause instanceof Error ? cause.message : String(cause)
+                    })
+                  } finally {
+                    setBusy(null)
+                  }
+                }}
+              >
+                <FileUp size={16} /> Import patients (CSV)
+              </Button>
+            </div>
+            <p className="field__hint">
+              The file needs a header row with at least <strong>Full Name</strong> and <strong>Phone</strong>.
+              Columns: {PATIENT_IMPORT.templateHeader.join(', ')}. Dates may be written as YYYY-MM-DD or
+              DD/MM/YYYY. Every row is validated before anything is saved, duplicates are skipped, and the
+              import is recorded in the audit log.
+            </p>
+          </Card>
+
+          {importDraft ? (
+            <Modal
+              title="Confirm the patient import"
+              size="lg"
+              onClose={() => setImportDraft(null)}
+              footer={
+                <>
+                  <Button onClick={() => setImportDraft(null)}>Cancel</Button>
+                  <Button
+                    variant="primary"
+                    disabled={importDraft.validRows === 0}
+                    loading={busy === 'import'}
+                    onClick={async () => {
+                      setBusy('import')
+                      try {
+                        const result = await invoke('data.import', {
+                          filePath: importDraft.filePath,
+                          dryRun: false
+                        })
+                        app.toast({
+                          tone: 'success',
+                          title: `Imported ${result.imported} patient(s)`,
+                          detail: `${result.duplicateRows} duplicate(s) skipped · ${result.invalidRows} invalid row(s) left out`
+                        })
+                        setImportDraft(null)
+                      } catch (cause) {
+                        app.toast({
+                          tone: 'error',
+                          title: 'Import failed',
+                          detail: cause instanceof Error ? cause.message : String(cause)
+                        })
+                      } finally {
+                        setBusy(null)
+                      }
+                    }}
+                  >
+                    Import {importDraft.validRows} patient(s)
+                  </Button>
+                </>
+              }
+            >
+              <p>
+                {importDraft.totalRows} row(s) read · {importDraft.validRows} ready to import ·{' '}
+                {importDraft.duplicateRows} duplicate(s) · {importDraft.invalidRows} row(s) with problems.
+              </p>
+              {importDraft.preview.length > 0 ? (
+                <DataTable
+                  compact
+                  rowKey={(row) => row.row}
+                  rows={importDraft.preview}
+                  columns={[
+                    { key: 'row', header: 'Line', align: 'right', render: (row) => row.row },
+                    { key: 'name', header: 'Patient', render: (row) => row.fullName },
+                    { key: 'phone', header: 'Phone', render: (row) => row.phone },
+                    { key: 'gender', header: 'Gender', render: (row) => row.gender ?? '—' },
+                    { key: 'city', header: 'City', render: (row) => row.city ?? '—' }
+                  ]}
+                />
+              ) : null}
+              {importDraft.issues.length > 0 ? (
+                <div style={{ marginTop: 'var(--space-4)' }}>
+                  <h4>Rows that will be left out</h4>
+                  <ul className="field__hint">
+                    {importDraft.issues.slice(0, 8).map((issue) => (
+                      <li key={`${issue.row}-${issue.field}`}>
+                        Line {issue.row}: {issue.field} — {issue.message}
+                        {issue.value ? ` (found “${issue.value}”)` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                  {importDraft.issues.length > 8 ? (
+                    <p className="field__hint">
+                      …and {importDraft.issues.length - 8} more problem(s) in the same file.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="field__hint">No problems found in the file.</p>
+              )}
+              <p className="field__hint">
+                Nothing has been saved yet. Confirming writes every ready row in one transaction with newly
+                generated patient codes and records the import in the audit log.
+              </p>
+            </Modal>
+          ) : null}
 
           <Card title="Diagnostics">
             <div className="toolbar">

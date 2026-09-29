@@ -86,6 +86,7 @@ import {
   referralInputSchema,
   referralListSchema,
   referralStatusSchema,
+  patientImportSchema,
   reportDataSchema,
   reportExportSchema,
   reportPrintSchema,
@@ -1186,6 +1187,11 @@ export function createRegistry(): Registry {
       schema: reportDataSchema,
       handler: (ctx, payload) =>
         buildReportData(ctx.services, { report: payload.report, from: payload.from, to: payload.to })
+    },
+    'data.import': {
+      permission: 'data.import',
+      schema: patientImportSchema,
+      handler: (ctx, payload) => ctx.services.clinical.importPatients(payload)
     },
     'reports.export': {
       // The service checks the permission again on its own side; the router entry keeps the request

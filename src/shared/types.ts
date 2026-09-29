@@ -1092,6 +1092,34 @@ export interface Paged<T> {
   pageSize: number
 }
 
+export interface PatientImportIssue {
+  /** 1-based line number in the file, as the user sees it in a spreadsheet. */
+  row: number
+  field: string
+  message: string
+  value: string | null
+}
+
+export interface PatientImportPreviewRow {
+  row: number
+  fullName: string
+  phone: string
+  gender: string | null
+  city: string | null
+}
+
+export interface PatientImportResult {
+  filePath: string
+  dryRun: boolean
+  totalRows: number
+  validRows: number
+  duplicateRows: number
+  invalidRows: number
+  imported: number
+  issues: PatientImportIssue[]
+  preview: PatientImportPreviewRow[]
+}
+
 export interface PatientQuery extends PageQuery {
   search?: string | null
   range?: 'today' | 'last7' | 'last30' | 'last90' | 'lastYear' | 'custom' | 'all'
