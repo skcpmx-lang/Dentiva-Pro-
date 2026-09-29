@@ -706,6 +706,7 @@ export function Modal({
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
+  const dialogRef = useDialogFocus(true)
   const sizeClass = size === 'lg' ? 'modal modal--wide' : size === 'sm' ? 'modal modal--narrow' : 'modal'
   return (
     <div
@@ -715,7 +716,7 @@ export function Modal({
         if (closeOnBackdrop && event.target === event.currentTarget) onClose()
       }}
     >
-      <div className={sizeClass} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={sizeClass} role="dialog" aria-modal="true" aria-label={title} ref={dialogRef}>
         <div className="modal__header">
           <h3>{title}</h3>
           <Button variant="ghost" size="sm" onClick={onClose} ariaLabel="Close">
@@ -748,13 +749,15 @@ export function Drawer({
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
+  const dialogRef = useDialogFocus(true)
+
   return (
     <div
       className="overlay"
       role="presentation"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
-      <aside className="drawer" role="dialog" aria-modal="true" aria-label={title}>
+      <aside className="drawer" role="dialog" aria-modal="true" aria-label={title} ref={dialogRef}>
         <div className="modal__header">
           <h3>{title}</h3>
           <Button variant="ghost" size="sm" onClick={onClose} ariaLabel="Close">
@@ -976,6 +979,8 @@ export function ProgressBar({
       <div
         className="progress-bar"
         role="progressbar"
+        // The visible label is not a form label, so the bar carries the name itself.
+        aria-label={label}
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
@@ -987,23 +992,54 @@ export function ProgressBar({
 }
 
 /** Focus trap for modals/drawers: keeps Tab inside the overlay while it is open. */
-export function useFocusTrap(active: boolean): (node: HTMLElement | null) => void {
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * The app's own hiding mechanisms, checked instead of layout: a control inside a `[hidden]` subtree, one
+ * marked `aria-hidden`, or one whose computed display/visibility hides it is not reachable with Tab.
+ * (Layout metrics would be cheaper, but they are meaningless outside a browser engine, and this hook is
+ * covered by component tests.)
+ */
+function isReachable(element: HTMLElement): boolean {
+  if (element.hasAttribute('disabled') || element.closest('[hidden]')) return false
+  if (element.getAttribute('aria-hidden') === 'true') return false
+  const style = window.getComputedStyle(element)
+  return style.display !== 'none' && style.visibility !== 'hidden'
+}
+
+/**
+ * Keeps a dialog usable with the keyboard: moves focus inside when it opens, cycles Tab inside it, locks
+ * the page behind it and gives focus back to whatever opened it when it closes.
+ */
+export function useDialogFocus(active: boolean): (node: HTMLElement | null) => void {
   const ref = useRef<HTMLElement | null>(null)
+
   useEffect(() => {
-    if (!active || !ref.current) return
+    if (!active) return
     const node = ref.current
-    const selector =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
-    const first = node.querySelector<HTMLElement>(selector)
-    first?.focus()
+    if (!node) return
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const focusables = (): HTMLElement[] =>
+      Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(isReachable)
+
+    const first = focusables()[0]
+    ;(first ?? node).focus()
+
     const handler = (event: KeyboardEvent): void => {
       if (event.key !== 'Tab') return
-      const focusable = Array.from(node.querySelectorAll<HTMLElement>(selector)).filter(
-        (element) => element.offsetParent !== null
-      )
-      if (focusable.length === 0) return
-      const firstElement = focusable[0]
-      const lastElement = focusable[focusable.length - 1]
+      const candidates = focusables()
+      if (candidates.length === 0) {
+        event.preventDefault()
+        node.focus()
+        return
+      }
+      const firstElement = candidates[0] as HTMLElement
+      const lastElement = candidates[candidates.length - 1] as HTMLElement
       if (event.shiftKey && document.activeElement === firstElement) {
         event.preventDefault()
         lastElement.focus()
@@ -1012,9 +1048,15 @@ export function useFocusTrap(active: boolean): (node: HTMLElement | null) => voi
         firstElement.focus()
       }
     }
+
     node.addEventListener('keydown', handler)
-    return () => node.removeEventListener('keydown', handler)
+    return () => {
+      node.removeEventListener('keydown', handler)
+      document.body.style.overflow = previousOverflow
+      previousFocus?.focus()
+    }
   }, [active])
+
   return useCallback((node: HTMLElement | null) => {
     ref.current = node
   }, [])
