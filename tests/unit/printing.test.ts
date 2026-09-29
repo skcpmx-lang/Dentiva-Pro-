@@ -9,6 +9,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { PAPER_SIZES } from '@shared/printing/paper'
+import type { InvoiceDocument, PrescriptionDocument } from '@shared/printing/model'
 import {
   buildHeader,
   buildInvoiceDocument,
@@ -17,7 +19,9 @@ import {
   buildReportDocument,
   SIGNATURE_CLEARANCE_MM,
   type ClinicForPrint,
-  type DentistForPrint
+  type DentistForPrint,
+  type InvoicePrintInput,
+  type PrescriptionPrintInput
 } from '@shared/printing/documents'
 
 const clinic: ClinicForPrint = {
@@ -40,9 +44,9 @@ const dentist: DentistForPrint = {
 
 const generatedAt = '2026-09-30 10:15:00'
 
-function prescription(overrides: Partial<Parameters<typeof buildPrescriptionDocument>[0]> = {}) {
-  return buildPrescriptionDocument({
-    paper: 'A4',
+function prescription(overrides: Partial<PrescriptionPrintInput> = {}): PrescriptionDocument {
+  const base: PrescriptionPrintInput = {
+    paper: PAPER_SIZES.A4,
     clinic,
     dentist,
     patient: buildPatientBlock({
@@ -101,14 +105,14 @@ function prescription(overrides: Partial<Parameters<typeof buildPrescriptionDocu
       dateFormat: 'dd MMM yyyy'
     },
     prescriptionId: 123,
-    generatedAt,
-    ...overrides
-  })
+    generatedAt
+  }
+  return buildPrescriptionDocument({ ...base, ...overrides })
 }
 
-function invoice(overrides: Partial<Parameters<typeof buildInvoiceDocument>[0]> = {}) {
-  return buildInvoiceDocument({
-    paper: 'A5',
+function invoice(overrides: Partial<InvoicePrintInput> = {}): InvoiceDocument {
+  const base: InvoicePrintInput = {
+    paper: PAPER_SIZES.A5,
     clinic,
     dentist,
     patient: buildPatientBlock({ name: 'Abdul Karim', code: 'P-000123', date: '2026-09-30' }),
@@ -160,9 +164,9 @@ function invoice(overrides: Partial<Parameters<typeof buildInvoiceDocument>[0]> 
     invoiceId: 456,
     generatedAt,
     voided: false,
-    voidReason: null,
-    ...overrides
-  })
+    voidReason: null
+  }
+  return buildInvoiceDocument({ ...base, ...overrides })
 }
 
 describe('print header', () => {
@@ -196,7 +200,7 @@ describe('prescription document', () => {
     const document = prescription()
     expect(document.kind).toBe('prescription')
     expect(document.title).toBe('Prescription')
-    expect(document.paper).toBe('A4')
+    expect(document.paper.key).toBe('A4')
     expect(document.documentId).toBe('RX-123')
     expect(document.generatedAt).toBe(generatedAt)
     expect(document.clinical.map((section) => section.label)).toEqual(['C/C', 'O/E', 'R/E', 'Advice'])
@@ -338,7 +342,7 @@ describe('invoice document', () => {
     const document = invoice()
     expect(document.kind).toBe('invoice')
     expect(document.title).toBe('Invoice')
-    expect(document.paper).toBe('A5')
+    expect(document.paper.key).toBe('A5')
     expect(document.documentId).toBe('INV-456')
     expect(document.invoiceNo).toBe('INV-2026-000123')
     expect(document.invoiceDate).toBe('30 Sep 2026')
@@ -425,7 +429,7 @@ describe('invoice document', () => {
 describe('report document', () => {
   it('formats the range, keeps the columns and footnotes the currency', () => {
     const document = buildReportDocument({
-      paper: 'A4',
+      paper: PAPER_SIZES.A4,
       clinic,
       title: 'Daily collection',
       from: '2026-09-01',
@@ -458,7 +462,7 @@ describe('report document', () => {
 
   it('drops the currency footnote when the report is not about money', () => {
     const document = buildReportDocument({
-      paper: 'A4',
+      paper: PAPER_SIZES.A4,
       clinic,
       title: 'Patient list',
       from: '2026-09-01',

@@ -25,32 +25,31 @@ import {
   resolvePermissions,
   SYSTEM_ROLES
 } from '@shared/permissions'
-import { PASSWORD_POLICY } from '@shared/constants'
+import { PASSWORD_POLICY, SCRYPT_PARAMS } from '@shared/constants'
 
 const strong = 'Dentiva#Chart2026'
 
 describe('password hashing', () => {
   it('stores the derivation parameters with the hash instead of a bare digest', () => {
-    const stored = hashPassword(strong, { N: 1024, r: 8, p: 1, keyLength: 16, saltLength: 8 })
+    const stored = hashPassword(strong)
     const [scheme, n, r, p, salt, hash] = stored.split('$')
     expect(scheme).toBe('scrypt')
-    expect([n, r, p]).toEqual(['1024', '8', '1'])
-    expect(salt).toMatch(/^[0-9a-f]{16}$/)
-    expect(hash).toMatch(/^[0-9a-f]{32}$/)
+    expect([n, r, p]).toEqual([String(SCRYPT_PARAMS.N), String(SCRYPT_PARAMS.r), String(SCRYPT_PARAMS.p)])
+    expect(salt).toMatch(/^[0-9a-f]+$/)
+    expect(salt).toHaveLength(SCRYPT_PARAMS.saltLength * 2)
+    expect(hash).toHaveLength(SCRYPT_PARAMS.keyLength * 2)
   })
 
   it('never produces the same hash twice for the same password, and still verifies both', () => {
-    const params = { N: 1024, r: 8, p: 1, keyLength: 16, saltLength: 8 }
-    const first = hashPassword(strong, params)
-    const second = hashPassword(strong, params)
+    const first = hashPassword(strong)
+    const second = hashPassword(strong)
     expect(first).not.toBe(second)
     expect(verifyPassword(strong, first)).toBe(true)
     expect(verifyPassword(strong, second)).toBe(true)
   })
 
   it('rejects a wrong password, a tampered hash, an unknown scheme and malformed input', () => {
-    const params = { N: 1024, r: 8, p: 1, keyLength: 16, saltLength: 8 }
-    const stored = hashPassword(strong, params)
+    const stored = hashPassword(strong)
     expect(verifyPassword(`${strong}!`, stored)).toBe(false)
     expect(verifyPassword('', stored)).toBe(false)
     expect(
