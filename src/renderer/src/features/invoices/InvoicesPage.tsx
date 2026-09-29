@@ -794,6 +794,12 @@ function InvoiceEditor({
     { enabled: invoiceId !== null, deps: [invoiceId] }
   )
 
+  const balance = useQuery(
+    'invoices.patientBalance',
+    { id: patientId },
+    { enabled: patientId > 0, deps: [patientId, savedId] }
+  )
+
   const create = useAction(async (input: InvoiceInput) => invoke('invoices.create', input))
   const update = useAction(async (id: number, input: InvoiceInput) =>
     invoke('invoices.update', { id, input })
@@ -969,6 +975,20 @@ function InvoiceEditor({
                 </button>
               ))}
             </div>
+          ) : null}
+          {patientId > 0 && balance.data !== null && !balance.loading ? (
+            balance.data > 0 ? (
+              <p className="hint">
+                Outstanding balance: <strong>{money(balance.data)}</strong>
+              </p>
+            ) : balance.data < 0 ? (
+              <p className="hint">
+                Advance held on this account: <strong>{money(-balance.data)}</strong> — record it as a payment
+                against this invoice instead of taking the money again.
+              </p>
+            ) : (
+              <p className="hint">No outstanding balance on this account.</p>
+            )
           ) : null}
         </div>
         <TextInput label="Invoice date" type="date" value={invoiceDate} onValueChange={setInvoiceDate} />

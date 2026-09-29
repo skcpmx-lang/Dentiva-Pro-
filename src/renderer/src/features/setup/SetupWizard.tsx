@@ -243,7 +243,7 @@ export function SetupWizard() {
               value={activationCode}
               onValueChange={setActivationCode}
               autoFocus
-              placeholder="1516591935015165"
+              placeholder="Enter the 16-digit code"
               hint={activation ? `${activation.attemptsRemaining} attempt(s) remaining` : undefined}
             />
             <div className="toolbar">

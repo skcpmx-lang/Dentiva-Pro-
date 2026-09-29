@@ -602,7 +602,7 @@ function PrescriptionEditor({
 
   const canWrite = app.hasPermission(prescriptionId ? 'prescriptions.edit' : 'prescriptions.create')
 
-  async function persist(andPrint: boolean): Promise<void> {
+  async function persist(mode: 'draft' | 'final'): Promise<void> {
     if (!canWrite) return
     if (patientId <= 0) {
       setError('Choose the patient this prescription is for.')
@@ -634,6 +634,7 @@ function PrescriptionEditor({
       advice: linesOf(advice),
       followUpDate: followUpDate || null,
       notes: notes.trim() || null,
+      status: mode,
       items
     }
 
@@ -645,13 +646,18 @@ function PrescriptionEditor({
     }
     const record = result.value
     setSavedId(record.id)
-    app.toast({ tone: 'success', title: savedId ? 'Prescription updated' : 'Prescription saved' })
-    if (andPrint) {
+    app.toast({
+      tone: 'success',
+      title: mode === 'final' ? 'Prescription finalised' : 'Draft saved',
+      detail: mode === 'final' ? undefined : 'It stays editable until you finalise it.'
+    })
+    if (mode === 'final') {
       const printed = await print.run(record.id, 'preview')
       if (!printed.ok)
         app.toast({ tone: 'error', title: 'Could not open the preview', detail: printed.error })
+    } else {
+      onClose(record.id)
     }
-    if (!andPrint) onClose(record.id)
   }
 
   function hasAnyMedicineField(draft: MedicineDraft): boolean {
@@ -677,11 +683,11 @@ function PrescriptionEditor({
             <Button onClick={() => onClose(savedId)}>Back to list</Button>
             {canWrite ? (
               <>
-                <Button loading={save.pending || update.pending} onClick={() => void persist(false)}>
-                  <Save size={16} /> Save
+                <Button loading={save.pending || update.pending} onClick={() => void persist('draft')}>
+                  <Save size={16} /> Save draft
                 </Button>
-                <Button variant="primary" loading={print.pending} onClick={() => void persist(true)}>
-                  <Printer size={16} /> Save &amp; preview
+                <Button variant="primary" loading={print.pending} onClick={() => void persist('final')}>
+                  <Printer size={16} /> Finalise &amp; preview
                 </Button>
               </>
             ) : null}
