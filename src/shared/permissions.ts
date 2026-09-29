@@ -292,13 +292,19 @@ export interface PermissionInput {
   overrides?: readonly PermissionOverride[]
 }
 
-/** Compute the effective permission set (deny always wins). */
+/**
+ * Compute the effective permission set. **A deny always wins**: every allow is applied first and every deny
+ * afterwards, so the result cannot depend on the order in which the override rows happen to arrive from the
+ * database. An administrator who removes a permission from a user can rely on it staying removed.
+ */
 export function resolvePermissions(input: PermissionInput): Set<PermissionCode> {
-  const effective = new Set<PermissionCode>()
-  for (const code of input.rolePermissions) effective.add(code)
-  for (const override of input.overrides ?? []) {
+  const effective = new Set<PermissionCode>(input.rolePermissions)
+  const overrides = input.overrides ?? []
+  for (const override of overrides) {
     if (override.effect === 'allow') effective.add(override.code)
-    else effective.delete(override.code)
+  }
+  for (const override of overrides) {
+    if (override.effect === 'deny') effective.delete(override.code)
   }
   return effective
 }
