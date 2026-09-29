@@ -104,7 +104,7 @@ printer_profiles | backups | settings | clinic_profile | app_meta | counters
 | `visit_treatments` | visit_id, treatment_id, tooth_refs_json, fee_poisha, note | used for invoices and treatment-revenue reporting |
 | `dental_chart_entries` | patient_id, visit_id NULL, tooth_number, dentition, condition_code, treatment_code, surfaces_json, status, note, audit cols | index `(patient_id, dentition, tooth_number)`; current chart = rows with `visit_id IS NULL`, per-visit history = rows with `visit_id` |
 | `visit_chart_snapshots` | `visit_id PK`, snapshot_json, created_at | frozen chart state at visit finalisation (REQ §22) |
-| `prescriptions` | patient_id, visit_id NULL, dentist_id, prescription_date, chief_complaints_json, on_examination_json, diagnosis (R/E), advice_json, follow_up_date, notes, status, printed_count, last_printed_at, audit cols | index `(patient_id, prescription_date DESC)`, `(prescription_date)` |
+| `prescriptions` | patient_id, visit_id NULL, dentist_id, prescription_date, chief_complaints_json, on_examination_json, diagnosis (R/E), advice_json, follow_up_date, notes, status (`draft`/`final`/`void`), void_reason, voided_at (migration 0004), printed_count, last_printed_at, audit cols | index `(patient_id, prescription_date DESC)`, `(prescription_date)`, `(status)` |
 | `prescription_items` | prescription_id, sort_order, medicine_name, medicine_type, strength, dose, morning/noon/night, timing, duration_value, duration_unit, quantity, instruction, conditional_instruction, notes | `UNIQUE(prescription_id, sort_order)` |
 | `referrals` | patient_id, visit_id NULL, referral_date, referring_dentist_id, referred_to_name, referred_to_institution, referred_to_phone, reason, notes, status, follow_up_date, outcome, audit cols | index `(patient_id, referral_date DESC)`, `(status)` |
 | `appointments` | patient_id, dentist_id, appointment_date, start_time, end_time, type_code, reason, notes, status, rescheduled_from_id NULL, cancelled_reason, audit cols | index `(appointment_date, start_time)`, `(patient_id, appointment_date DESC)`, `(dentist_id, appointment_date)`; status CHECK in the 9 canonical states |
@@ -141,7 +141,7 @@ printer_profiles | backups | settings | clinic_profile | app_meta | counters
 ## 5. Migrations
 
 * Explicit, ordered, deterministic SQL migrations in `src/main/db/migrations/`:
-  `0001_initial_schema.sql`, `0002_seed_defaults.sql`, `0003_indexes.sql`, …
+  `0001_initial_schema.sql`, `0002_seed_defaults.sql`, `0003_indexes.sql`, `0004_prescription_void_reason.sql`, …
 * Each migration runs inside a transaction, is recorded in `schema_migrations` with a checksum, and is
   idempotent-safe (checksum mismatch aborts startup with a clear recovery message rather than mutating
   data).

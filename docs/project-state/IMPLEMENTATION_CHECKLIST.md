@@ -49,7 +49,7 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 3.4 | Dental chart (FDI, per-tooth entries tied to visits, history) | **Done** (service) | `clinical.test.ts`, `dental-ids-csv.test.ts`; on-screen interaction still to be reviewed in the E2E pass |
 | 3.5 | Appointments with the full status set and rescheduling | **Done** | `clinical.test.ts` |
 | 3.6 | Queue with priority, reorder and persistence | **Done** (ordering) | `clinical.test.ts`; restart-persistence assertion missing |
-| 3.7 | Prescriptions: structured C/C, O/E, R/E, advice; multi-medicine rows; draft/final; void | **Done** (service) | `clinical.test.ts`; the screen rewrite against the real channels is the next UI task (see §7) |
+| 3.7 | Prescriptions: structured C/C, O/E, R/E, advice; multi-medicine rows; draft/final; void | **Done** (service) | `clinical.test.ts`: full medicine model, reorder, draft→final, status filter, void reason/date; the screen runs on the same channels |
 | 3.8 | Referrals | **Done** | `clinical.test.ts` |
 | 3.9 | Treatment catalogue and clinical option lists | **Partial** | Repositories + services implemented; CRUD integration test missing (AT-E01) |
 | 3.10 | Attachments with safe file handling | **Partial** | `billing-service.attachFile` (path traversal, size limits) is used by the stress run; the validation assertions are missing (AT-E07) |
@@ -70,7 +70,7 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 
 | # | Item | Status | Evidence / what is missing |
 |---|---|---|---|
-| 5.1 | Prescription print layout with blank signature area ≥25 mm | **Partial** | `printing/documents.ts` builds the document; a unit test for the clearance and the “nothing below the signature” rule is missing (AT-D05) |
+| 5.1 | Prescription print layout with blank signature area ≥25 mm | **Done** | `printing.test.ts` asserts the clearance and that the signature block is the last content key (AT-D05); page rendering is a desktop test |
 | 5.2 | Invoice print header limited to clinic name/logo/address/phone, no signature footer | **Partial** | Implemented; assertion missing |
 | 5.3 | Preview window (`#/print/{jobId}`), print, save as PDF via `printToPDF` | **Done** (code) | `printing/print-host.ts`, `PrintDocumentView`; PDF fidelity has never been executed (no Electron in the sandbox) → AT-D06 |
 | 5.4 | Paper sizes A4/A5/thermal 58/80 mm, printer profiles | **Partial** | `shared/printing/paper.ts` + profiles; the print matrix run is pending (AT-D07) |
@@ -93,7 +93,7 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 7.3 | Empty / loading / error states on every list | **Partial** | Present per screen; not systematically asserted |
 | 7.4 | Unsaved-changes warnings | **Partial** | Implemented in the form screens; not asserted |
 | 7.5 | Keyboard shortcuts and global search | **Partial** | Implemented; shortcut E2E missing (AT-G04) |
-| 7.6 | Prescriptions screen against the real channels | **Open** | The staged rewrite was discarded for using non-existent channels; the rewrite is the immediate UI task |
+| 7.6 | Prescriptions screen against the real channels | **Done** | Screen uses `prescriptions.*`, `patients.lookup`, `clinical.options` and `print.build`/`print.job`; exercised through the real router in the preview harness (create → finalise → print build → void) |
 | 7.7 | Responsive 1366×768 → 4K, 100–200 % DPI | **Partial** | Layout uses relative units; DPI verification pending (AT-G06) |
 | 7.8 | Accessibility pass (focus, ARIA, labels, contrast) | **Partial** | Semantic markup and focus handling exist; audit pending (AT-G05) |
 

@@ -21,9 +21,9 @@ last_updated: 2026-09-29
 | Project scaffolding (Electron + TS + React + SQLite + electron-builder) | **Complete** |
 | Database schema + migrations + repositories | **Complete** (migrations 0001–0003; fixture/checksum tests pending) |
 | Services + IPC router (business-layer authorization) | **Complete** (~140 channels, every service checks permissions) |
-| Renderer design system + shell + feature screens | **Complete** (prescriptions screen rewrite outstanding) |
-| Unit tests | **48 passing** (money, date, ids, dental, csv) |
-| Integration tests | **46 passing** (setup/auth 9, clinical 9, billing 13, backup/audit 15) |
+| Renderer design system + shell + feature screens | **Complete** (prescriptions screen runs on the real channels; verified through the router in the preview harness) |
+| Unit tests | **104 passing** (money 16, date 15, dental/ids/csv 17, printing 21, security 15, validation 20) |
+| Integration tests | **65 passing** (setup/auth 9, clinical 10, billing 13, admin 18, backup/audit 15) |
 | End-to-end (Electron) suites | **Written, first run pending on windows-latest** |
 | Performance measurement (NFR-003) | **Measured** — `docs/testing/PERFORMANCE_MEASUREMENTS.md` |
 | Dependency/licence audit + third-party notices | **Complete** (`npm run audit:deps`, `npm run licenses`) |
@@ -34,8 +34,8 @@ last_updated: 2026-09-29
 ## Machine-readable task state
 
 ```yaml
-current_task: Prescriptions screen rewrite against the real IPC channels
-next_task: Unit-test batches (password/session/activation, permissions, printing, validation)
+current_task: Prescriptions print/void corrections shipped; next is the remaining pre-release audit sweep
+next_task: Pre-release audits (spec §113), then the packaged Windows installer run on windows-latest
 completed:
   - docs/* (requirements, architecture, ADRs, database, security, ux, printing, backup-restore, testing, compliance, project-state, user guide)
   - src/shared/** (money incl. fromDecimalString, date, ids, dental, csv, permissions, validation, constants, printing models)
@@ -49,15 +49,32 @@ completed:
   - maintenance tooling (dependency audit, third-party notices, backup verifier, release artifact verifier, stress seeder, preview harness)
   - GitHub Actions ci.yml + release.yml, Playwright config + e2e suites
 in_progress:
-  - Prescriptions screen (features/prescriptions/PrescriptionsPage.tsx) against prescriptions.* / patients.lookup / clinical.options / print.build → print.job
+  - Remaining pre-release audits and the packaged installer run (the prescriptions screen rewrite itself is complete and verified through the real router)
 failed_tests: []
 known_issues:
   - Electron cannot run in the development sandbox (no binary), so E2E, PDF fidelity, print matrix and DPI checks only run on windows-latest.
   - Empty folders kept out of git (for example an empty attachments directory) must be created by the code at runtime; do not re-add committed placeholder files.
 pending_fixes: []
 last_successful_build: green (electron-vite build, out/renderer ~1.45 MB js + 49 kB css; GitHub Actions quality job green)
-last_successful_test: 94 passing locally (48 unit + 46 integration) with DENTIVA_ACTIVATION_CODE set; without it 6 pass and 40 skip by design. GitHub CI: lint/types/build/unit + maintenance jobs green, integration + e2e waiting for the secret.
+last_successful_test: 169 passing locally (104 unit + 65 integration) with DENTIVA_ACTIVATION_CODE set; without it the activation-dependent integration suites report as skipped by design. GitHub CI: lint/types/build/unit + maintenance jobs green, integration + e2e waiting for the repository secret.
 ```
+
+## Corrections found by running the app (2026-09-30, keep them fixed)
+
+Running the prescriptions flow through the real IPC router exposed four defects that no passing unit test
+had caught. All four are fixed, with integration coverage:
+
+1. **`status` never reached the service.** `prescriptionInputSchema` had no `status` field and the router
+   hands the *parsed* payload to the handler, so "Finalise" always saved a draft. The schema now carries
+   `status: 'draft' | 'final'` (never `void`), and `clinical.test.ts` asserts the finalisation persists.
+2. **An edit without a status reset the sheet to draft.** The repository wrote `status = @status`; it now
+   uses `COALESCE(@status, status)` so a reorder cannot silently draft a final sheet.
+3. **The register's status filter was ignored.** `PrescriptionQuery`/`PrescriptionRepository.list` had no
+   `status` filter while the channel advertised one; it is now a real `WHERE r.status = @status` clause.
+4. **The void reason was discarded.** The channel validated a reason (min 3 characters) and the service
+   threw it away, and the table had nowhere to keep it. Migration `0004` adds `void_reason`/`voided_at`,
+   `Prescription.voidReason`/`voidedAt` are exposed, the audit entry quotes the reason, the confirm dialog
+   now asks for one (invoices and payments too), and voided prescriptions are refused by the print path.
 
 ## Environment notes (important for resuming)
 

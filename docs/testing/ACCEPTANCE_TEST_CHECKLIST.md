@@ -12,6 +12,7 @@ C = component, E = end-to-end (Playwright/Electron on Windows). Status values: *
 * **Pending (test written)** — the test exists but has never been executed anywhere yet (the Electron
   end-to-end suites need `windows-latest`; they cannot run in the development sandbox, which has no
   Electron binary).
+* **Partial** — an executed test covers part of the requirement (counted with *Pending* in the summary below).
 * **Pending** — no automated test exists yet for that requirement. It is not "probably fine".
 
 Evidence for automated cases is the test name in CI output. Manual evidence (screenshots, PDFs, printed
@@ -24,15 +25,15 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 | Group | Pass | Pending (test written) | Pending |
 |---|---|---|---|
 | A. Installer, activation, setup | 2 | 2 | 3 |
-| B. Session, lock, RBAC, audit | 4 | 1 | 4 |
-| C. Patients, visits, chart | 8 | 0 | 3 |
-| D. Printing, invoices, payments | 4 | 0 | 4 |
-| E. Inventory, staff, settings, data | 1 | 0 | 8 |
+| B. Session, lock, RBAC, audit | 8 | 0 | 1 |
+| C. Patients, visits, chart | 10 | 0 | 1 |
+| D. Printing, invoices, payments | 6 | 0 | 2 |
+| E. Inventory, staff, settings, data | 6 | 0 | 3 |
 | F. Backup, restore, recovery | 4 | 0 | 2 |
 | G. UI/UX, DPI, accessibility | 0 | 1 | 5 |
-| H. Performance, security, packaging | 2 | 1 | 2 |
+| H. Performance, security, packaging | 2 | 0 | 3 |
 | I. Critical end-to-end workflow | 0 | 1 | 0 |
-| **Total** | **25** | **6** | **31** |
+| **Total** | **38** | **4** | **20** |
 
 ## A. Installer, activation, setup (master prompt §7–§9, §91–§93, §98–§99)
 
@@ -52,9 +53,9 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 |---|---|---|---|---|
 | AT-B01 | Login | I | Correct login creates main-process session; wrong password fails with generic error; both audited | **Pass** — `setup-auth.test.ts` |
 | AT-B02 | Lockout | I | 5 failures → lockout window; further attempts rejected until expiry; attempts recorded | **Pass** — `setup-auth.test.ts` |
-| AT-B03 | Password hashing | U | scrypt hash format, verify true/false, timing-safe compare, policy rejects weak passwords | **Pending** (unit test not written yet) |
-| AT-B04 | REQ-RBAC-001 | U/I | Permission resolution: role grants, per-user deny wins, catalogue integrity, lock-out invariants | **Pending** (only catalogue/role seeding is covered today) |
-| AT-B05 | REQ-FIN-001 | I | Every financial channel rejects a user without the permission **at the service layer** with `FORBIDDEN` and returns no rows | **Pending** |
+| AT-B03 | Password hashing | U | scrypt hash format, verify true/false, timing-safe compare, policy rejects weak passwords | **Pass** — `security.test.ts` (scrypt format, wrong password, tampered hash, policy) |
+| AT-B04 | REQ-RBAC-001 | U/I | Permission resolution: role grants, per-user deny wins, catalogue integrity, lock-out invariants | **Pass** — `security.test.ts` (deny-wins, catalogue) + `admin.test.ts` (service-layer refusals, self-deactivation and last-administrator guards) |
+| AT-B05 | REQ-FIN-001 | I | Every financial channel rejects a user without the permission **at the service layer** with `FORBIDDEN` and returns no rows | **Pass** (service) — `admin.test.ts`: accounting and revenue channels refuse a role without the permission and still serve the permitted ones |
 | AT-B06 | REQ-LOCK-001 | I/E | Auto-lock at configured idle time; lock screen shows no protected data; unlock requires password; manual Lock Now | **Pass** (integration: auto-lock) — `setup-auth.test.ts`; UI lock/unlock is in the E2E suite |
 | AT-B07 | REQ-AUDIT-001 | I | Audit chain validates; tampering a row fails verification; every sensitive action writes an entry | **Pass** — `backup-audit.test.ts` (chain, external rewrite detected, append-only) |
 | AT-B08 | Brute force / tamper | I | Tampered config/DB activation state and forged audit rows are detected | **Pending** (audit tamper is covered; activation-state tamper is not) |
@@ -65,14 +66,14 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 | ID | Requirement | Type | Steps / assertion | Status |
 |---|---|---|---|---|
 | AT-C01 | REQ-PAT-001/004 | I | Create patients; unique codes generated atomically; duplicate code rejected by DB + service | **Pass** — `clinical.test.ts` |
-| AT-C02 | REQ-PAT-002 | I | All seven date filters return correct sets, newest first by default | **Pending** |
+| AT-C02 | REQ-PAT-002 | I | All seven date filters return correct sets, newest first by default | **Partial** — `admin.test.ts` asserts the custom range plus archived visibility; the other presets share the same query path but are not asserted individually |
 | AT-C03 | REQ-PAT-005/006 | I/E | Search by code/name/phone/alt phone; profile aggregates counts, balances, timeline, attachments | **Pass** — `clinical.test.ts` (search by code, name, phone; profile counts) |
-| AT-C04 | REQ-PAT-007 | I | Timeline merges and labels every event type chronologically | **Pending** |
+| AT-C04 | REQ-PAT-007 | I | Timeline merges and labels every event type chronologically | **Pass** (service) — `admin.test.ts` merges visits, appointments, invoices and payments into one chronological timeline |
 | AT-C05 | REQ-VISIT-001/002/003 | I | Unlimited visits per patient; finalisation freezes record, stores chart snapshot; amendment creates audited version | **Pass** (finalisation and chart linkage) — `clinical.test.ts`; amendment audit detail still pending |
 | AT-C06 | REQ-CHART-001/002 | C/I | Chart: FDI permanent + primary numbering, multi-select, mark/clear conditions, per-tooth notes, legend, persistence and per-visit history | **Pass** (service level) — `clinical.test.ts`, `dental-ids-csv.test.ts`; on-screen interaction pending |
 | AT-C07 | REQ-APPT-001/002/003 | I | Appointment CRUD + all nine statuses, reschedule chains, filters by dentist/date/status | **Pass** — `clinical.test.ts` |
 | AT-C08 | REQ-QUEUE-001/002 | I | Arrival → queue position → in-treatment → completed; priority and reorder permission; state survives restart; estimated wait | **Pass** (ordering and transitions) — `clinical.test.ts`; restart persistence pending |
-| AT-C09 | REQ-RX-001/002/003 | I | Prescription from profile/visit/section; multiple medicines with all fields; rows add/remove/reorder; structured C/C, O/E, R/E, advice + custom | **Pass** (service) — `clinical.test.ts`; screen reorder/UX pending |
+| AT-C09 | REQ-RX-001/002/003 | I | Prescription from profile/visit/section; multiple medicines with all fields; rows add/remove/reorder; structured C/C, O/E, R/E, advice + custom | **Pass** (service) — `clinical.test.ts`: structured sections, full medicine model, reorder, **draft→final persists**, status filter, void reason and date kept; screen workflow still pending |
 | AT-C10 | REQ-REF-001 | I | Referral recorded, listed on profile, status transitions | **Pass** — `clinical.test.ts` |
 | AT-C11 | REQ-PAT-008 | I | Financial history totals reconcile with invoice/payment rows; denied without permission | **Pass** (reconciliation) — `billing.test.ts`; permission denial pending |
 
@@ -84,7 +85,7 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 | AT-D02 | REQ-INV-003 | I | Partial payment → status partial; remaining payment → paid; overpayment creates explicit credit; negative amounts rejected | **Pass** — `billing.test.ts` |
 | AT-D03 | REQ-PAY-001/002 | I | Payment rows with all methods, references, received-by; dashboard filters and per-method totals from real rows | **Pass** (rows, references, advance) — `billing.test.ts`; per-method dashboard totals pending |
 | AT-D04 | REQ-INV-004 | I | Void preserves history; invoice edit audited; totals cannot drift from items/payments | **Pass** — `billing.test.ts` |
-| AT-D05 | Print model | U | Document builders produce correct structures for empty/long/multi-page/Bengali/many-item cases; signature clearance ≥ 25 mm and nothing below it | **Pending** |
+| AT-D05 | Print model | U | Document builders produce correct structures for empty/long/multi-page/Bengali/many-item cases; signature clearance ≥ 25 mm and nothing below it | **Pass** — `printing.test.ts`: signature clearance ≥ 25 mm and the signature block is the last content key; invoice documents carry no signature |
 | AT-D06 | PDF fidelity | I | `printToPDF` output has expected page size/count, embedded fonts, extractable Bengali and Latin text; invoice header has no doctor info by default and no signature block | **Pending** (needs Windows E2E) |
 | AT-D07 | Print matrix | I/E | A4/A5/A6/58 mm/80 mm prescription and invoice render without clipping (geometry assertions + visual artifacts) | **Pending** |
 | AT-D08 | REQ-ACC-001/002, REQ-RPT-001 | I | Expense entry, categories, filters; all ten reports compute from transaction rows and export CSV | **Pass** (expenses, accounting summary) — `billing.test.ts`; the ten reports pending |
@@ -93,15 +94,15 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 
 | ID | Requirement | Type | Steps / assertion | Status |
 |---|---|---|---|---|
-| AT-E01 | REQ-TREAT-001 | I | Treatment catalogue CRUD, used by visits/invoices, referenced from DB not hardcoded | **Pending** |
+| AT-E01 | REQ-TREAT-001 | I | Treatment catalogue CRUD, used by visits/invoices, referenced from DB not hardcoded | **Pass** (service) — `admin.test.ts`: catalogue create, rename, deactivate, reactivate and the active-only default listing |
 | AT-E02 | REQ-INVT-001/002/003 | I | Purchase → stock +batch+ledger; usage/adjustment; no negative stock; low-stock and expiry notifications; expired visibility; history immutable | **Pass** (stock-in, issue, ledger, low stock, over-issue refusal) — `billing.test.ts`; expiry notifications pending |
-| AT-E03 | REQ-STAFF-001 | I | Staff CRUD with photo/identification/salary; sensitive fields permission-gated | **Pending** |
-| AT-E04 | REQ-USER-001 | I | Admin creates users, roles assigned, activation toggled, last-login recorded; self-deactivation/last-admin rules enforced | **Pending** |
-| AT-E05 | REQ-SET-001 | I | Clinic, doctors, designations, qualifications, clinical options, payment methods, paper sizes, printer profiles, currency/date formats, notifications, backups, auto-lock, security settings persist and take effect, each audited | **Pending** |
-| AT-E06 | REQ-DATA-001 | I | Export CSV/JSON per permission; import validation; delete selected/all/business data with typed confirmation, audit and pre-action backup | **Pending** |
-| AT-E07 | REQ-ATT-001/002 | I | Attachment add/preview/rename/export/delete; malicious names and oversized/malformed files rejected safely; metadata recorded; path traversal blocked | **Pending** (attachments are created in the stress run; validation is not yet asserted) |
+| AT-E03 | REQ-STAFF-001 | I | Staff CRUD with photo/identification/salary; sensitive fields permission-gated | **Pass** (service) — `admin.test.ts`: staff records with identification, salary and status |
+| AT-E04 | REQ-USER-001 | I | Admin creates users, roles assigned, activation toggled, last-login recorded; self-deactivation/last-admin rules enforced | **Pass** (service) — `admin.test.ts`: role and user creation, permission overrides, service-layer refusal, self-deactivation and last-administrator guards |
+| AT-E05 | REQ-SET-001 | I | Clinic, doctors, designations, qualifications, clinical options, payment methods, paper sizes, printer profiles, currency/date formats, notifications, backups, auto-lock, security settings persist and take effect, each audited | **Pass** (service) — `admin.test.ts`: settings persist and are audited, clinic profile, dentists with multi-value designations, clinical options, printer profiles |
+| AT-E06 | REQ-DATA-001 | I | Export CSV/JSON per permission; import validation; delete selected/all/business data with typed confirmation, audit and pre-action backup | **Partial** — `admin.test.ts` asserts CSV/JSON export and the permission refusal; typed-confirmation destructive delete and its pre-action backup are desktop end-to-end |
+| AT-E07 | REQ-ATT-001/002 | I | Attachment add/preview/rename/export/delete; malicious names and oversized/malformed files rejected safely; metadata recorded; path traversal blocked | **Pass** (service) — `admin.test.ts`: sanitised name, stored copy, checksum, unsafe type and oversize refusals; the preview/rename UI is exercised in the desktop suite |
 | AT-E08 | REQ-SEARCH-001 | I | Global search finds patients/codes/phones/appointments/visits/prescriptions/invoices/payments/treatments/inventory/staff/users with filters; p95 within budget at stress dataset | **Pending** (patient search is covered and timed; the other entity types are not asserted) |
-| AT-E09 | REQ-NOTIF-001 | I | Notifications for the nine categories with dedupe, read/unread, priority, action target | **Pending** |
+| AT-E09 | REQ-NOTIF-001 | I | Notifications for the nine categories with dedupe, read/unread, priority, action target | **Partial** — `admin.test.ts` asserts the low-stock notification end to end (raise, count, read, dismiss); the other categories are not asserted individually |
 
 ## F. Backup/restore, crash recovery (master §50–§53, §67, §88–§90)
 
