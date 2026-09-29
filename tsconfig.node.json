@@ -33,6 +33,7 @@
     "tests/integration/**/*.ts",
     "tests/e2e/**/*.ts",
     "scripts/**/*.mjs",
+    "scripts/**/*.ts",
     "electron.vite.config.ts",
     "vitest.config.ts"
   ]

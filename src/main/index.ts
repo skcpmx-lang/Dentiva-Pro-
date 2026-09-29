@@ -33,6 +33,8 @@ import { Logger, setGlobalLogger } from './logging/logger'
 import { SessionManager } from './security/session'
 import { PrintHost } from './printing/print-host'
 import { applyInitialDefaults, createServices, type Services } from './services/container'
+import { countThirdPartyComponents, noticeFileCandidates } from './services/third-party'
+import { SettingsRepository } from './db/repositories-core'
 import { createRegistry, type Registry, type RegistryHost } from './ipc/registry'
 import { createInvoker } from './ipc/router'
 import { loadAppConfig, loadWindowState, saveWindowState, type PersistedWindowState } from './window-state'
@@ -266,12 +268,22 @@ function buildPrintDocument(payload: IpcPayload<'print.build'>) {
   return current.admin.buildReportPrint(payload.reportRequest)
 }
 
+/**
+ * Locate a file that ships as an `extraResource`.
+ *
+ * In the packaged application it lives in `resources/…`; in development the same file is taken from the
+ * repository so the About page, the user guide and the licence notices work without a build step.
+ */
 function findResource(...relative: string[]): string {
   const candidates = [
     process.resourcesPath ? join(process.resourcesPath, ...relative) : null,
-    join(app.getAppPath(), ...relative)
+    join(app.getAppPath(), ...relative),
+    join(app.getAppPath(), ...relative.slice(1)),
+    join(process.cwd(), ...relative.slice(1))
   ].filter((entry): entry is string => entry !== null)
-  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[candidates.length - 1]
+  return (
+    candidates.find((candidate) => existsSync(candidate)) ?? (candidates[candidates.length - 1] as string)
+  )
 }
 
 function createHost(): RegistryHost {
@@ -429,7 +441,8 @@ function createHost(): RegistryHost {
     dataRoot: () => layout?.root ?? '',
     userGuidePath: () => findResource('user-guide', 'USER_GUIDE.html'),
     thirdPartyNotices: () => {
-      const file = findResource('legal', 'THIRD_PARTY_NOTICES.txt')
+      // Packaged: resources/legal/THIRD-PARTY-NOTICES.txt. Development: docs/compliance/THIRD-PARTY-NOTICES.txt.
+      const file = findResource('legal', 'THIRD-PARTY-NOTICES.txt')
       try {
         return existsSync(file) ? readFileSync(file, 'utf8') : ''
       } catch {
@@ -453,7 +466,7 @@ function createHost(): RegistryHost {
         platform: process.platform,
         arch: process.arch,
         dataRoot: layout?.root ?? '',
-        thirdPartyCount: runtimeDependencyCount()
+        thirdPartyCount: thirdPartyComponentCount()
       }
     },
     startWorker: async (kind) => {
@@ -640,14 +653,12 @@ function startSchedulers(): void {
 // Container wiring
 // -----------------------------------------------------------------------------------------------
 
-function runtimeDependencyCount(): number {
-  try {
-    const file = join(app.getAppPath(), 'package.json')
-    const parsed = JSON.parse(readFileSync(file, 'utf8')) as { dependencies?: Record<string, string> }
-    return Object.keys(parsed.dependencies ?? {}).length
-  } catch {
-    return 0
-  }
+/** How many third-party components ship in this build (read from the generated notices, never guessed). */
+function thirdPartyComponentCount(): number {
+  return countThirdPartyComponents({
+    noticeFiles: noticeFileCandidates(process.resourcesPath ?? null, app.getAppPath()),
+    manifestFile: join(app.getAppPath(), 'package.json')
+  })
 }
 
 function buildContainerOptions(db: SqliteDatabase): Parameters<typeof createServices>[0] {
@@ -664,7 +675,7 @@ function buildContainerOptions(db: SqliteDatabase): Parameters<typeof createServ
       chrome: process.versions.chrome,
       node: process.versions.node,
       sqlite: String((db.prepare('SELECT sqlite_version() AS v').get() as { v: string }).v),
-      thirdPartyCount: runtimeDependencyCount()
+      thirdPartyCount: thirdPartyComponentCount()
     },
     activation: {
       activated: Boolean(
@@ -737,9 +748,9 @@ function bootstrap(): void {
   // Idempotent: writes the system meta values and any setting that does not exist yet.
   applyInitialDefaults(database, BUILD_INFO.version)
 
-  const autoLockRow = database.prepare("SELECT value FROM settings WHERE key = 'autoLockMinutes'").get() as
-    { value: string } | undefined
-  const autoLockMinutes = Number(autoLockRow?.value ?? 10)
+  // Read through the repository: settings are stored as JSON in `value_json`, and the session manager needs
+  // the configured auto-lock timeout before the service container exists.
+  const autoLockMinutes = new SettingsRepository(database).get().autoLockMinutes
 
   sessionManager = new SessionManager({
     autoLockMinutes: Number.isFinite(autoLockMinutes) && autoLockMinutes > 0 ? autoLockMinutes : 10,
@@ -773,7 +784,8 @@ function bootstrap(): void {
   const { invoke } = createInvoker({
     registry,
     session: sessionManager,
-    services,
+    // A getter, not the current value: after a restore the container is rebuilt and the router must use it.
+    services: () => services!,
     host: createHost(),
     logger,
     appVersion: BUILD_INFO.version,

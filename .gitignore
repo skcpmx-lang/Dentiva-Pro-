@@ -11,3 +11,6 @@ test-results/
 *.local
 .vite/
 tsconfig.tsbuildinfo
+.preview-data/
+.stress-data/
+node_modules/.cache/

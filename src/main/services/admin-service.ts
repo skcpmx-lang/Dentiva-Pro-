@@ -6,7 +6,6 @@
  * password re-authentication, a `pre_destructive` backup, then the action — all audited.
  */
 
-import { createHash } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
@@ -54,6 +53,7 @@ import {
 import type { InvoiceDocument, PrescriptionDocument, ReportDocument } from '@shared/printing/model'
 import { PAPER_SIZE_KEYS, resolvePaper, type PaperSizeKey } from '@shared/printing/paper'
 import { assertWritableFolder, resolveStoredPath, toRelativePath, type DataLayout } from '../storage/paths'
+import { sha256File } from '../storage/hashing'
 import { closeDatabase, openDatabase, type SqliteDatabase } from '../db/connection'
 import { runIntegrityCheck, verifyAuditChain } from '../db/integrity'
 import { CatalogueRepository } from '../db/repositories-core'
@@ -1640,10 +1640,6 @@ function collectChecksums(root: string, exclude: string[]): { path: string; hash
   }
   walk(root)
   return entries.sort((a, b) => a.path.localeCompare(b.path))
-}
-
-function sha256File(file: string): string {
-  return createHash('sha256').update(readFileSync(file)).digest('hex')
 }
 
 function folderSize(folder: string): number {

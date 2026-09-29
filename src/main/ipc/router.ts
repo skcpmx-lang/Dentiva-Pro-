@@ -23,7 +23,13 @@ import type { ChannelHandler, HandlerContext, Registry, RegistryHost } from './r
 export interface RouterOptions {
   registry: Registry
   session: SessionManager
-  services: Services
+  /**
+   * The service container, or a function returning the current one.
+   *
+   * A restore swaps the database file and rebuilds the container, so the router must always resolve the
+   * live container instead of holding on to the one that existed when the window opened.
+   */
+  services: Services | (() => Services)
   host: RegistryHost
   logger: Logger
   appVersion: string
@@ -63,9 +69,14 @@ export function createInvoker(options: RouterOptions): {
   invoke: (channel: unknown, payload: unknown) => Promise<IpcResult<unknown>>
   context: HandlerContext
 } {
-  const { registry, session, services, host, logger, appVersion } = options
+  const { registry, session, host, logger, appVersion } = options
+  const currentServices = (): Services =>
+    typeof options.services === 'function' ? options.services() : options.services
+
   const context: HandlerContext = {
-    services,
+    get services() {
+      return currentServices()
+    },
     session,
     host,
     setTerminalUnauthenticated: () => options.onTerminalUnauthenticated?.()
@@ -73,7 +84,7 @@ export function createInvoker(options: RouterOptions): {
 
   const audit = (action: string, summary: string, severity: 'info' | 'warning' | 'critical'): void => {
     try {
-      services.audit.append({
+      currentServices().audit.append({
         actorUserId: session.userId,
         actorUsername: session.username,
         action,
