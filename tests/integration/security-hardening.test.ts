@@ -115,6 +115,44 @@ suite('migration guard', () => {
     ).toThrow(/append-only/)
   })
 
+  it('detects a forged audit row through the hash chain', () => {
+    // A healthy installation: the chain verifies and every entry is accounted for.
+    const healthy = harness.services.admin.auditChainStatus()
+    expect(healthy.valid).toBe(true)
+    expect(healthy.firstBrokenId).toBeNull()
+    expect(healthy.checkedEntries).toBeGreaterThan(0)
+
+    harness.services.clinical.createPatient(patientInput({ fullName: 'Audit Witness' }))
+
+    // While the guard triggers are in place (they are created by migration 0003 and belong to the
+    // database, so every connection — the app or an external tool — is bound by them), the trail cannot
+    // be edited at all.
+    expect(() =>
+      harness.services.db.prepare("UPDATE audit_log SET summary = 'x' WHERE id = 1").run()
+    ).toThrow(/append-only/)
+    expect(() => harness.services.db.prepare('DELETE FROM audit_log').run()).toThrow(/append-only/)
+
+    // Somebody with file access can drop the guard and edit what an entry claims. That cannot be prevented
+    // in an offline file-based installation — which is exactly why every entry is chained by hash: the
+    // forgery is detected even when the trigger is gone.
+    const external = harness.reopen()
+    external.exec('DROP TRIGGER trg_audit_no_update')
+    external
+      .prepare("UPDATE audit_log SET summary = 'Nothing happened here' WHERE action = 'patients.create'")
+      .run()
+    external.close()
+
+    const broken = harness.services.admin.auditChainStatus()
+    expect(broken.valid).toBe(false)
+    expect(broken.firstBrokenId).not.toBeNull()
+    expect(broken.message).toMatch(/modified|broken|tamper/i)
+
+    // The deep integrity run reports the same problem rather than staying green.
+    const report = harness.services.admin.runIntegrity(true)
+    expect(report.ok).toBe(false)
+    expect(report.checks.some((check) => !check.ok)).toBe(true)
+  })
+
   it('refuses to start when an applied migration no longer matches its checksum', () => {
     const root = mkdtempSync(join(tmpdir(), 'dentiva-migrate-'))
     const file = join(root, 'tampered.db')
