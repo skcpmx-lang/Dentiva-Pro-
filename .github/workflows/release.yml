@@ -2,7 +2,8 @@ name: Release (Windows installer)
 
 # Produces the real Windows application: NSIS installer, unpacked application, checksums and build
 # information. Runs on a version tag (v1.0.0) or on demand. The release is only created after the
-# artifact has been verified by the same script the release checklist uses.
+# artifact has been verified by the same script the release checklist uses, and it is created as a
+# draft unless a manual run explicitly asks for a published release.
 
 on:
   push:
@@ -26,11 +27,11 @@ jobs:
     env:
       DENTIVA_ACTIVATION_CODE: ${{ secrets.DENTIVA_ACTIVATION_CODE }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -88,7 +89,7 @@ jobs:
         run: npm run verify:installer
 
       - name: Upload the installer and checksums
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: DentivaPro-Setup-windows-x64
           path: |
@@ -104,13 +105,21 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DRAFT: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || 'false' }}
+          INPUT_DRAFT: ${{ inputs.draft }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then TAG="${GITHUB_REF_NAME}"; else TAG="v${VERSION}"; fi
           TITLE="Dentiva Pro $VERSION"
           NOTES="Windows installer for Dentiva Pro $VERSION. See release/build-info.json for the commit and build date, and release/SHA256SUMS.txt for checksums."
           FILES="release/DentivaPro-Setup-${VERSION}-x64.exe release/SHA256SUMS.txt release/build-info.json"
+          # Drafts are the default for every path: only a manual run that explicitly asks for
+          # draft=false publishes the release straight away. A mistaken tag push can therefore never
+          # publish a build that a human has not looked at.
+          DRAFT="true"
+          if [ "${INPUT_DRAFT}" = "false" ]; then
+            DRAFT="false"
+          fi
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" $FILES --clobber
           elif [ "$DRAFT" = "true" ]; then
