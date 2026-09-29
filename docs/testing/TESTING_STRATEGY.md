@@ -15,6 +15,8 @@
 | End-to-end (real Electron app) | Playwright `_electron` | `tests/e2e/**.e2e.ts` | `windows-latest`, every push + release |
 | Stress/performance | Vitest + seeded dataset | `tests/integration/performance.test.ts` | CI (reduced dataset) and release (full dataset) |
 | Print/PDF fidelity | Vitest + PDF fixture assertions | `tests/integration/print.test.ts` | CI |
+| Pre-release audits (REQ §113) | Node script over the real repository | `scripts/pre-release-audit.mjs` | all platforms, every push (maintenance job) |
+| Traceability freshness | Node script comparing the generated matrix | `scripts/generate-traceability-matrix.mjs --check` | all platforms, every push (maintenance job) |
 | Packaging/installer | GitHub Actions step + `scripts/verify-release-artifact.mjs` | `release.yml` | `windows-latest` on release |
 
 ## 2. What must be covered (REQ §100)
@@ -64,6 +66,12 @@ scenarios, auto-lock timing, keyboard shortcuts, empty/loading/error states, and
 7. `npm run audit:deps` + `npm run licenses` — no high/critical advisories, all licences compatible.
 8. Manual audits: functional, UI/UX/visual, database, security, print matrix, performance, dependency,
    installer, backup/restore, release (results in `RELEASE_READINESS.md`).
+9. `npm run audit:prerelease` — the fourteen automated pre-release audits of REQ §113. The two that need a
+   packaged Windows build (A13 pipeline evidence, A14 release artefacts) report **skipped** off Windows and
+   must be green before a release; a skip is never reported as a pass.
+10. `npm run docs:traceability` — the requirements matrix (`docs/testing/TRACEABILITY_MATRIX.md`) is
+   regenerated from the specification, the acceptance checklist and the design records, and
+   `--check` fails the build when it drifts.
 
 ## 5. Defect handling
 

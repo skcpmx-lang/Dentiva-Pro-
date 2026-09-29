@@ -94,6 +94,9 @@ npm test              # unit + integration suites
 npm run test:coverage # coverage report
 npm run test:e2e      # Playwright Electron acceptance tests (Windows)
 npm run audit:deps    # dependency + licence audit
+npm run audit:prerelease   # the 14 pre-release audits of the master specification (§113)
+npm run docs:traceability  # regenerate the requirements traceability matrix
+node scripts/verify-backup.mjs <backup folder>   # verify a backup outside the application
 ```
 
 The activation verifier is bound to a fixed offline secret, so the integration and end-to-end suites
@@ -114,9 +117,16 @@ The code itself is deliberately not stored in the repository; for CI add it as t
 # on a clean checkout of the release tag/branch
 npm ci
 npm run verify
+node scripts/generate-traceability-matrix.mjs --check
+npm run audit:prerelease -- --report pre-release-audit.md
 npm run package:win
 node scripts/verify-release-artifact.mjs
 ```
+
+`docs/release/RELEASE_READINESS.md` states which gates have actually been executed and which evidence is
+still outstanding; `docs/testing/TRACEABILITY_MATRIX.md` maps every requirement to its design record, its
+implementation and the acceptance rows that verify it. Neither document may claim a green gate that was
+not run.
 
 Artifacts land in `release/` (installer, portable exe, `latest.yml`, `SHA256SUMS.txt`) and are published by
 `.github/workflows/release.yml` to a GitHub Release; when publication is not possible the same artifacts are

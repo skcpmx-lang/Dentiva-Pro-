@@ -44,7 +44,7 @@ The seeder inserts any missing permission at startup (forward-compatible) and ne
 | **Receptionist** | Front desk | `patients.view/create/edit`, `appointments.*` (except delete), `queue.*`, `invoices.view/create/print`, `payments.view/create/print`, `notifications.*`, `patients.attachments.view`; **no** clinical editing, **no** `reports.financial.view`, **no** accounting |
 | **Accountant** | Finance | `invoices.*` (view/print/void), `payments.*`, `accounting.*`, `reports.financial.*`, `inventory.view`, `patients.view` (limited: no clinical), `data.export`; no clinical or destructive permissions |
 | **Assistant / Nurse** | Chair-side help | `patients.view`, `appointments.view`, `queue.view/manage`, `chart.view`, `visits.view`, `prescriptions.view`, `inventory.view`, `inventory.manage` |
-| **Auditor (read-only)** | Compliance review | `*.view` set + `audit.view`, `audit.export`, `reports.financial.view`; **no** create/edit/delete anywhere |
+| **Auditor (read-only)** | Compliance review | `*.view` set + `audit.view`, `audit.export`, `data.export` (the router gate of the export channel) and `reports.financial.view`; **no** create/edit/delete anywhere |
 
 Roles are data, not code: an administrator can create custom roles, clone system roles, and change any
 permission except the invariant `*` safety rules below.
@@ -70,7 +70,7 @@ permission except the invariant `*` safety rules below.
 | Services | re-check for compound operations (e.g. invoicing a visit requires `invoices.create` **and** `patients.view`) |
 | Repositories | no permission logic (pure data access, unreachable from renderer) |
 | Renderer | `usePermission()` for affordances only; every mutation still server-checked |
-| Reports/exports | export channels declare their own permissions (`*.export`); CSV/PDF export of financial data requires the financial export permission |
+| Reports/exports | `export.data` is gated on `data.export` at the router and then narrowed per entity in the service (`patients.export`, `inventory.export`, `audit.export`, `accounting.export`, financial entities → `reports.financial.export`); `reports.export` writes the report the screen shows under `reports.financial.export`. Every role that may export one dataset therefore also carries `data.export` — asserted by a unit test — so a screen never offers an export the router will refuse |
 
 ## 6. Verification
 

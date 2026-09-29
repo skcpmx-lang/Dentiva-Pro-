@@ -122,6 +122,20 @@ jobs:
           npm run licenses
           git diff --exit-code docs/compliance/THIRD-PARTY-NOTICES.md docs/compliance/THIRD-PARTY-NOTICES.txt
 
+      - name: Confirm the requirements traceability matrix is current
+        run: node scripts/generate-traceability-matrix.mjs --check
+
+      - name: Pre-release audits (master prompt §113)
+        run: npm run audit:prerelease -- --report "$RUNNER_TEMP/pre-release-audit.md"
+
+      - name: Keep the pre-release audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-release-audit
+          path: ${{ runner.temp }}/pre-release-audit.md
+          if-no-files-found: warn
+
       - name: Performance run on a reduced dataset (budgets must hold)
         run: node scripts/seed-stress-data.mjs --scale 0.1 --root "$RUNNER_TEMP/stress" --no-report
 

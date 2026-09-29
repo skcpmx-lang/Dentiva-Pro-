@@ -40,7 +40,9 @@
     "verify": "npm run lint && npm run typecheck && npm run test:coverage",
     "preview:harness": "node scripts/preview-server.mjs",
     "verify:installer": "node scripts/verify-release-artifact.mjs",
-    "verify:backup": "node scripts/verify-backup.mjs"
+    "verify:backup": "node scripts/verify-backup.mjs",
+    "audit:prerelease": "node scripts/pre-release-audit.mjs",
+    "docs:traceability": "node scripts/generate-traceability-matrix.mjs"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3"

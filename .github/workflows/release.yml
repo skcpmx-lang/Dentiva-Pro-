@@ -74,6 +74,11 @@ jobs:
           npm run licenses
           git diff --exit-code docs/compliance/
 
+      - name: Pre-release audits (master prompt §113) and tracing check
+        run: |
+          node scripts/generate-traceability-matrix.mjs --check
+          npm run audit:prerelease -- --report pre-release-audit.md
+
       - name: Build and package the NSIS installer
         run: npm run package:win
         env:
