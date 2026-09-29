@@ -1,0 +1,329 @@
+/* =================================================================================================
+   Print styles — shared by the on-screen preview and the print window.
+   The preview and the printed sheet use the same DOM, so "what you see is what prints".
+   Paper size, margins and font sizes come from the resolved PaperSize in the document.
+   ================================================================================================= */
+
+.print-root {
+  background: var(--ink-100);
+  min-height: 100vh;
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.print-sheet {
+  background: #fff;
+  color: #111;
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans);
+  font-size: 11pt;
+  line-height: 1.35;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.print-sheet--thermal {
+  box-shadow: var(--shadow-sm);
+  font-size: 9.5pt;
+}
+
+.print-toolbar {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.9);
+  padding: 8px;
+  border-radius: var(--radius-md);
+}
+
+.print-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12pt;
+  border-bottom: 2px solid #0f6d80;
+  padding-bottom: 8pt;
+  margin-bottom: 10pt;
+}
+
+.print-header__logo {
+  width: 62pt;
+  height: 62pt;
+  object-fit: contain;
+}
+
+.print-header__clinic {
+  flex: 1;
+}
+
+.print-header__clinic h1 {
+  margin: 0;
+  font-size: 16pt;
+  color: #07303a;
+  letter-spacing: 0.2pt;
+}
+
+.print-header__clinic h2 {
+  margin: 2pt 0 0;
+  font-size: 12pt;
+  font-weight: 500;
+  color: #0f6d80;
+}
+
+.print-header__clinic p {
+  margin: 2pt 0 0;
+  font-size: 9pt;
+  color: #333;
+}
+
+.print-header__meta {
+  text-align: right;
+  font-size: 9pt;
+  color: #333;
+  min-width: 150pt;
+}
+
+.print-header__meta strong {
+  display: block;
+  font-size: 11pt;
+  color: #07303a;
+}
+
+.print-patient {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2pt 16pt;
+  border: 1px solid #cbd5e1;
+  border-radius: 4pt;
+  padding: 6pt 8pt;
+  margin-bottom: 10pt;
+  font-size: 9.5pt;
+}
+
+.print-patient__row {
+  display: flex;
+  gap: 6pt;
+}
+
+.print-patient__label {
+  color: #475569;
+  min-width: 62pt;
+}
+
+.print-section {
+  margin-bottom: 8pt;
+}
+
+.print-section__label {
+  font-weight: 700;
+  color: #0f6d80;
+  font-size: 10pt;
+  text-transform: uppercase;
+  letter-spacing: 0.4pt;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 2pt;
+  margin-bottom: 3pt;
+}
+
+.print-section__line {
+  white-space: pre-wrap;
+}
+
+.print-medicines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+
+.print-medicines th,
+.print-medicines td {
+  border: 1px solid #cbd5e1;
+  padding: 3pt 4pt;
+  vertical-align: top;
+  text-align: left;
+}
+
+.print-medicines th {
+  background: #eef7f9;
+  color: #07303a;
+  font-size: 8.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.3pt;
+}
+
+.print-medicines td.center,
+.print-medicines th.center {
+  text-align: center;
+}
+
+.print-medicines__conditional {
+  font-style: italic;
+  color: #7c2d12;
+}
+
+.print-items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+
+.print-items th,
+.print-items td {
+  border-bottom: 1px solid #cbd5e1;
+  padding: 3.5pt 4pt;
+  text-align: left;
+}
+
+.print-items th {
+  background: #eef7f9;
+  color: #07303a;
+}
+
+.print-items td.right,
+.print-items th.right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.print-totals {
+  margin-left: auto;
+  width: 58%;
+  margin-top: 8pt;
+  font-size: 9.5pt;
+}
+
+.print-totals__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1.5pt 0;
+}
+
+.print-totals__row--grand {
+  border-top: 1.5px solid #0f6d80;
+  margin-top: 3pt;
+  padding-top: 3pt;
+  font-weight: 700;
+  font-size: 12pt;
+  color: #07303a;
+}
+
+.print-signature {
+  margin-top: 18pt;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.print-signature__block {
+  text-align: center;
+  min-width: 180pt;
+}
+
+/* The signature area stays physically blank: no line, no printed text inside the reserved space. */
+.print-signature__space {
+  display: block;
+}
+
+.print-signature__name {
+  font-weight: 600;
+  border-top: 1px solid #111;
+  padding-top: 2pt;
+}
+
+.print-signature__designation {
+  font-size: 8.5pt;
+  color: #333;
+}
+
+.print-footer {
+  margin-top: auto;
+  padding-top: 6pt;
+  border-top: 1px dashed #cbd5e1;
+  font-size: 8pt;
+  color: #475569;
+  display: flex;
+  justify-content: space-between;
+  gap: 12pt;
+}
+
+.print-quote {
+  font-style: italic;
+  text-align: center;
+  font-size: 9pt;
+  color: #0f6d80;
+  margin-top: 6pt;
+}
+
+.print-void {
+  position: absolute;
+  inset: 30% 10% auto 10%;
+  text-align: center;
+  font-size: 40pt;
+  color: rgba(185, 28, 28, 0.22);
+  border: 4pt solid rgba(185, 28, 28, 0.22);
+  padding: 12pt;
+  transform: rotate(-8deg);
+  letter-spacing: 6pt;
+  pointer-events: none;
+}
+
+.print-report__col-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.print-report__col-center {
+  text-align: center;
+}
+
+.print-summaries {
+  margin-top: 10pt;
+  display: flex;
+  justify-content: flex-end;
+  gap: 18pt;
+  font-size: 10pt;
+}
+
+.print-summaries__item--emphasis {
+  font-weight: 700;
+  color: #07303a;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  .print-root {
+    padding: 0;
+    background: #fff;
+  }
+
+  .print-sheet {
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+
+  .print-toolbar,
+  .app-shell,
+  .toast-stack,
+  .overlay {
+    display: none !important;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+}
