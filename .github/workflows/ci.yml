@@ -80,6 +80,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Require the activation code for the suite
+        env:
+          DENTIVA_ACTIVATION_CODE: ${{ secrets.DENTIVA_ACTIVATION_CODE }}
+        run: |
+          if [ -z "$DENTIVA_ACTIVATION_CODE" ]; then
+            echo "::error::This job needs the DENTIVA_ACTIVATION_CODE repository secret (Settings -> Secrets and variables -> Actions -> New repository secret). The activation verifier uses a fixed offline secret, so the suite cannot be faked; without the secret every activation-dependent test would be skipped and the result would prove nothing."
+            exit 1
+          fi
+
       - name: Integration tests with coverage
         run: npm run test:coverage
 
@@ -130,6 +139,16 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Require the activation code for the suite
+        shell: bash
+        env:
+          DENTIVA_ACTIVATION_CODE: ${{ secrets.DENTIVA_ACTIVATION_CODE }}
+        run: |
+          if [ -z "$DENTIVA_ACTIVATION_CODE" ]; then
+            echo "::error::This job needs the DENTIVA_ACTIVATION_CODE repository secret (Settings -> Secrets and variables -> Actions -> New repository secret). The activation verifier uses a fixed offline secret, so the suite cannot be faked; without the secret every activation-dependent test would be skipped and the result would prove nothing."
+            exit 1
+          fi
 
       - name: Build the application
         run: npm run build:app
