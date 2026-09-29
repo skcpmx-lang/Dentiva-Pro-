@@ -16,20 +16,28 @@ const password = 'Harness#Pass1'
 
 let harness: Harness
 
+/**
+ * The activation gate is a fixed offline secret, so the whole suite needs `DENTIVA_ACTIVATION_CODE`.
+ * Without it the tests are reported as skipped (CI refuses to run this job without the secret), never
+ * silently "passing".
+ */
+const suite = activationCode.length > 0 ? describe : describe.skip
+
 beforeEach(() => {
+  if (activationCode.length === 0) return
   harness = createHarness()
   completeSetup(harness, { activationCode, password })
 })
 
 afterEach(() => {
-  harness.dispose()
+  harness?.dispose()
 })
 
 function backupRoot(): string {
   return harness.layout.backupsDir
 }
 
-describe('audit trail', () => {
+suite('audit trail', () => {
   it('records every clinical change with the actor, and the hash chain verifies', () => {
     harness.services.clinical.createPatient(patientInput({ fullName: 'Audited Patient' }))
 
@@ -97,7 +105,7 @@ describe('audit trail', () => {
   })
 })
 
-describe('backups', () => {
+suite('backups', () => {
   it('creates a timestamped, self-describing backup that verifies', async () => {
     harness.services.clinical.createPatient(patientInput({ fullName: 'Backup Patient' }))
     const record = await harness.services.admin.createBackup('manual', { includeAttachments: true })

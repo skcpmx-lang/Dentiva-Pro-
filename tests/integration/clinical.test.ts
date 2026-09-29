@@ -15,7 +15,15 @@ const activationCode = process.env.DENTIVA_ACTIVATION_CODE ?? ''
 let harness: Harness
 let dentistId = 0
 
+/**
+ * The activation gate is a fixed offline secret, so the whole suite needs `DENTIVA_ACTIVATION_CODE`.
+ * Without it the tests are reported as skipped (CI refuses to run this job without the secret), never
+ * silently "passing".
+ */
+const suite = activationCode.length > 0 ? describe : describe.skip
+
 beforeAll(() => {
+  if (activationCode.length === 0) return
   harness = createHarness()
   completeSetup(harness, { activationCode })
   dentistId = harness.services.dentists.list(false)[0]?.id ?? 0
@@ -25,7 +33,7 @@ afterAll(() => {
   harness.dispose()
 })
 
-describe('patient register', () => {
+suite('patient register', () => {
   it('creates patients with sequential clinic codes and finds them by code, name and phone', () => {
     const first = harness.services.clinical.createPatient(patientInput())
     const second = harness.services.clinical.createPatient(
@@ -82,7 +90,7 @@ describe('patient register', () => {
   })
 })
 
-describe('visits and dental chart', () => {
+suite('visits and dental chart', () => {
   it('records a visit with treatments and finalises it', () => {
     const patient = harness.services.clinical.createPatient(patientInput({ fullName: 'Visit Person' }))
     const visit = harness.services.clinical.createVisit({
@@ -233,7 +241,7 @@ describe('visits and dental chart', () => {
   })
 })
 
-describe('appointments and queue', () => {
+suite('appointments and queue', () => {
   it('books, reschedules and cancels appointments', () => {
     const patient = harness.services.clinical.createPatient(patientInput({ fullName: 'Appointment Person' }))
     const appointment = harness.services.clinical.createAppointment({
