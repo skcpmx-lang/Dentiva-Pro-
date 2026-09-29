@@ -17,15 +17,14 @@ asarUnpack:
   - node_modules/better-sqlite3/**
 
 extraResources:
-  - from: assets/fonts
-    to: fonts
-    filter: ['**/*']
-  - from: assets/branding
-    to: branding
-    filter: ['**/*']
+  # The user guide, the licence notices and the branding that the About page links to. Fonts are bundled
+  # by the renderer build (Vite inlines the @fontsource files), so no font folder is copied here.
   - from: docs/user-guide
     to: user-guide
-    filter: ['**/*.md']
+    filter: ['USER_GUIDE.html']
+  - from: docs/compliance
+    to: legal
+    filter: ['THIRD-PARTY-NOTICES.txt']
 
 win:
   target:

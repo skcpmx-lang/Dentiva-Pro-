@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dentiva Pro — User Guide</title>
+    <style>
+      :root {
+        --teal: #0f766e;
+        --teal-dark: #115e59;
+        --ink: #0f172a;
+        --muted: #475569;
+        --line: #e2e8f0;
+        --soft: #f8fafc;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', system-ui, -apple-system, 'Noto Sans Bengali', sans-serif;
+        color: var(--ink);
+        line-height: 1.55;
+        background: #fff;
+      }
+      .page { max-width: 900px; margin: 0 auto; padding: 32px 28px 64px; }
+      header.cover {
+        border-bottom: 4px solid var(--teal);
+        padding-bottom: 20px;
+        margin-bottom: 28px;
+      }
+      .brand { display: flex; align-items: center; gap: 14px; }
+      .mark {
+        width: 48px; height: 48px; border-radius: 12px;
+        background: var(--teal); color: #fff; display: grid; place-items: center;
+        font-weight: 700; font-size: 20px; letter-spacing: -0.5px;
+      }
+      h1 { font-size: 26px; margin: 0 0 4px; }
+      .sub { color: var(--muted); margin: 0; }
+      h2 {
+        font-size: 19px; margin: 34px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+      }
+      h3 { font-size: 15px; margin: 20px 0 6px; color: var(--teal-dark); }
+      p, li { font-size: 14px; }
+      ul, ol { padding-left: 22px; }
+      table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+      th, td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+      th { background: var(--soft); }
+      .callout {
+        border-left: 4px solid var(--teal); background: var(--soft);
+        padding: 10px 14px; margin: 12px 0; font-size: 13.5px;
+      }
+      .warn { border-left-color: #b45309; }
+      kbd {
+        background: #0f172a; color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 12px;
+        font-family: 'Cascadia Mono', Consolas, monospace;
+      }
+      code { background: var(--soft); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+      .toc { columns: 2; column-gap: 32px; font-size: 13.5px; }
+      .toc a { color: var(--teal-dark); text-decoration: none; }
+      footer { margin-top: 44px; border-top: 1px solid var(--line); padding-top: 14px; color: var(--muted); font-size: 12.5px; }
+      @media print {
+        .page { max-width: none; padding: 0 8mm; }
+        h2 { page-break-after: avoid; }
+        table, .callout { page-break-inside: avoid; }
+        a { color: inherit; text-decoration: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="cover">
+        <div class="brand">
+          <div class="mark" aria-hidden="true">DP</div>
+          <div>
+            <h1>Dentiva Pro — User Guide</h1>
+            <p class="sub">Offline dental clinic management for Windows · Version 1.0.0 · Bangladesh</p>
+          </div>
+        </div>
+      </header>
+
+      <h2 id="contents">Contents</h2>
+      <nav class="toc">
+        <a href="#about">1. About Dentiva Pro</a><br />
+        <a href="#install">2. Installing and first run</a><br />
+        <a href="#window">3. The main window</a><br />
+        <a href="#patients">4. Patients</a><br />
+        <a href="#visits">5. Visits and the dental chart</a><br />
+        <a href="#appointments">6. Appointments and the queue</a><br />
+        <a href="#treatments">7. Treatment catalogue</a><br />
+        <a href="#prescriptions">8. Prescriptions</a><br />
+        <a href="#printing">9. Printing and PDF</a><br />
+        <a href="#billing">10. Invoices and payments</a><br />
+        <a href="#inventory">11. Inventory</a><br />
+        <a href="#accounting">12. Accounting and reports</a><br />
+        <a href="#staff">13. Staff and permissions</a><br />
+        <a href="#security">14. Security and the audit log</a><br />
+        <a href="#backups">15. Backups and restoring</a><br />
+        <a href="#settings">16. Settings and data management</a><br />
+        <a href="#troubleshooting">17. Troubleshooting</a><br />
+        <a href="#about-product">18. Licence, version and third-party notices</a>
+      </nav>
+
+      <h2 id="about">1. About Dentiva Pro</h2>
+      <p>
+        Dentiva Pro is a desktop application for a dental practice. Every patient record, appointment,
+        prescription, invoice, payment, stock movement and audit entry is stored in a single database file on
+        this computer. The application never needs the internet: it works the same on a clinic network with no
+        connection at all.
+      </p>
+      <table>
+        <tr><th>Requirement</th><th>Detail</th></tr>
+        <tr><td>Operating system</td><td>Windows 10 or Windows 11 (64-bit)</td></tr>
+        <tr><td>Display</td><td>1366 × 768 or larger; scales cleanly up to 4K at 100–200 % scaling</td></tr>
+        <tr><td>Disk</td><td>About 400 MB for the program plus the space your records need</td></tr>
+        <tr><td>Printer</td><td>Any Windows printer — A4/A5 laser, thermal receipt, Bluetooth or wireless</td></tr>
+        <tr><td>Internet</td><td>Not required for daily use. Only the optional update check needs it</td></tr>
+      </table>
+      <div class="callout">
+        <strong>Where your data lives.</strong> By default:
+        <code>%APPDATA%\Dentiva Pro</code> — containing <code>Data\dentiva.db</code> (the database),
+        <code>Attachments\</code> (scanned files and images), <code>Backups\</code>, <code>Logs\</code> and
+        <code>Config\</code>. Uninstalling the program never deletes this folder.
+      </div>
+
+      <h2 id="install">2. Installing and first run</h2>
+      <ol>
+        <li>Run <code>DentivaPro-Setup-1.0.0-x64.exe</code> and choose the installation folder if you do not
+          want the default. The installer is per-user by default, so it does not need an administrator
+          password, but it can be elevated if you prefer a machine-wide install.</li>
+        <li>Start <strong>Dentiva Pro</strong> from the Start menu or the desktop shortcut.</li>
+        <li>The setup wizard opens the first time only.</li>
+      </ol>
+      <h3>Step 1 — Activation</h3>
+      <p>
+        Enter the one-time activation code supplied with your licence and choose
+        <strong>Activate</strong>. The code is verified on this computer without contacting any server.
+        Ten wrong attempts start a 60-second cool-down; every attempt is written to the audit log.
+      </p>
+      <h3>Step 2 — Clinic details</h3>
+      <p>
+        Enter the clinic name (English and, optionally, Bengali), address, phone numbers, e-mail, website and
+        registration number. Choose the clinic logo (PNG/JPEG, up to 2 MB) if you have one. The clinic block
+        appears at the top of every printed prescription and invoice — nothing else is printed in the header.
+      </p>
+      <h3>Step 3 — Dentists</h3>
+      <p>
+        Add each dentist who signs reports: full name, one or more designations, one or more qualifications,
+        registration number, phone, e-mail, signature image and consulting hours. You can add more later in
+        <strong>Administration → Dentists</strong>.
+      </p>
+      <h3>Step 4 — Administrator</h3>
+      <p>
+        Create the first administrator account. Choose a username and a password of at least 10 characters.
+        Passwords are stored with scrypt hashing; nobody — including the Dentiva Pro team — can read them back.
+        Keep this password safe: it is the account that can restore backups and change permissions.
+      </p>
+      <div class="callout warn">
+        <strong>Activation is honest about what it is.</strong> The application ships with a fixed offline
+        secret, so a determined person with the source code and the binary can recover it. Activation protects
+        against casual copying and clearly records which clinic installed the product; it is not, and cannot
+        be, cryptographically unbreakable without an online licence server.
+      </div>
+
+      <h2 id="window">3. The main window</h2>
+      <ul>
+        <li><strong>Header:</strong> clinic logo and name, the <strong>notification centre</strong> bell
+          (low stock, expiring batches, backup results, appointment reminders), the <strong>lock</strong>
+          button, and the <strong>user menu</strong> (profile, change password, About, sign out).</li>
+        <li><strong>Sidebar:</strong> collapsible groups — <em>Practice</em> (dashboard, appointments, queue,
+          patients), <em>Clinical</em> (visits, dental chart, prescriptions, treatments), <em>Billing</em>
+          (invoices, payments, inventory, accounting, reports) and <em>Administration</em> (staff, audit log,
+          backups, settings, About). Your role decides which entries appear, and the service layer refuses
+          anything your role is not allowed to do even if the screen were reached another way.</li>
+        <li><strong>Global search</strong> (<kbd>Ctrl</kbd>+<kbd>K</kbd>) finds a patient by code, name (English
+          or Bengali) or phone, from anywhere in the application.</li>
+        <li><strong>Keyboard:</strong> <kbd>Ctrl</kbd>+<kbd>K</kbd> search · <kbd>Ctrl</kbd>+<kbd>L</kbd> lock ·
+          <kbd>Ctrl</kbd>+<kbd>P</kbd> print the current document · <kbd>Esc</kbd> close a dialog ·
+          <kbd>Enter</kbd> confirm · <kbd>Ctrl</kbd>+<kbd>S</kbd> save a form.</li>
+      </ul>
+
+      <h2 id="patients">4. Patients</h2>
+      <p>
+        <strong>Practice → Patients</strong> lists patients newest first. Filter by date range (today, this
+        week, this month, custom) and search by name, code or phone. The list is paged, so it stays fast with
+        many thousands of records.
+      </p>
+      <ul>
+        <li>Every patient gets a unique, sequential <strong>patient code</strong>; the code is used on
+          prescriptions, invoices and attachments.</li>
+        <li>Open a patient to see the profile: overview, dental chart, timeline, visits, appointments,
+          treatments, prescriptions, invoices, payments, referrals and attachments — each on its own tab.</li>
+        <li><strong>Archive</strong> a patient who has left the practice. Archived patients are hidden from the
+          register but keep every record; an administrator can restore one at any time with the same code.</li>
+        <li>Clinical and financial history is never deleted. Corrections are added as new entries so the
+          original stays visible (see §5).</li>
+      </ul>
+
+      <h2 id="visits">5. Visits and the dental chart</h2>
+      <p>
+        A visit records what happened on a date: complaints, examination, diagnosis, treatment performed,
+        advice and follow-up. A visit starts as <em>draft</em> and is <strong>finalised</strong> when the
+        clinician signs it off. A finalised visit can no longer be edited directly — amending it creates a
+        clearly marked correction, and both versions stay in the history.
+      </p>
+      <p>
+        The dental chart uses FDI notation (11–48 permanent, 51–85 primary). Click a tooth to record its
+        condition and treatment; each entry is stored with the visit it belongs to, so you can see how the
+        chart looked at any point in time.
+      </p>
+
+      <h2 id="appointments">6. Appointments and the queue</h2>
+      <ul>
+        <li>Create an appointment with patient, dentist, date, start time, duration and reason. Statuses:
+          scheduled, confirmed, arrived, in treatment, completed, cancelled, no-show and rescheduled.</li>
+        <li><strong>Queue</strong> shows the patients waiting today, ordered by priority (emergency, urgent,
+          normal) and then by position. You can move an entry within its priority, mark it in treatment or
+          completed, and the queue is stored in the database, so it survives a restart.</li>
+        <li>The dashboard shows today's appointments and the live queue count.</li>
+      </ul>
+
+      <h2 id="treatments">7. Treatment catalogue</h2>
+      <p>
+        <strong>Clinical → Treatments</strong> holds the procedures your clinic performs with their default
+        fee, category and description. Treatments are used when writing prescriptions and when building
+        invoices; deactivate a treatment instead of deleting it so old invoices keep their details.
+      </p>
+
+      <h2 id="prescriptions">8. Prescriptions</h2>
+      <p>A prescription has four narrative blocks and a structured medicine table:</p>
+      <table>
+        <tr><th>Block</th><th>What goes in it</th></tr>
+        <tr><td>C/C — Chief complaints</td><td>One line per complaint, chosen from your clinic list or typed</td></tr>
+        <tr><td>O/E — On examination</td><td>Findings, e.g. “Deep caries in 36”</td></tr>
+        <tr><td>R/E — Rx / Records</td><td>Investigations, diagnosis and medicines</td></tr>
+        <tr><td>Advice</td><td>Instructions such as “Warm saline rinse twice daily”</td></tr>
+      </table>
+      <p>
+        Each medicine row carries the medicine name, type (tablet, syrup, mouthwash…), strength, dose, the
+        morning/noon/night slots, before or after food, duration with its unit, quantity, and an optional
+        conditional instruction such as “if pain occurs”. Rows can be reordered and removed. Rows can be
+        saved as a <strong>draft</strong> while you are still working, or
+        <strong>finalised</strong> and printed.
+      </p>
+      <div class="callout">
+        <strong>Signature area.</strong> The printed prescription reserves a blank area of at least 25 mm
+        below the dentist's block for a wet signature. No text is printed in that space, and that is
+        deliberate — the clinic signs the paper.
+      </div>
+
+      <h2 id="printing">9. Printing and PDF</h2>
+      <ul>
+        <li>Every printable document first opens a <strong>preview</strong> that shows exactly what will be
+          printed, including Bengali text.</li>
+        <li>Paper sizes: <strong>A4</strong>, <strong>A5</strong>, <strong>thermal 80 mm</strong> and
+          <strong>thermal 58 mm</strong>. Choose the paper per document; the layout adapts.</li>
+        <li><strong>Printer profiles</strong> (Settings → Printing) remember which printer, tray, paper and
+          number of copies each document type uses — including Bluetooth and wireless printers installed in
+          Windows.</li>
+        <li><strong>Save as PDF</strong> writes a PDF with the fonts embedded, so Bengali text renders exactly
+          as on screen. Choose where to save it when asked.</li>
+        <li>Invoices print with the clinic name, logo, address and phone only. There is no signature block on
+          the invoice, and no other footer.</li>
+      </ul>
+
+      <h2 id="billing">10. Invoices and payments</h2>
+      <ul>
+        <li>An invoice is built from treatments, products or free-text lines, with quantity, unit price and line
+          discount, then an invoice-level discount, tax and an optional round-off to whole taka.</li>
+        <li>All money is handled in poisha internally, so totals never drift by a paisa. BDT (৳) is the only
+          currency.</li>
+        <li>Payments can be <strong>cash</strong>, <strong>bank transfer</strong>, <strong>card</strong>,
+          <strong>bKash</strong>, <strong>Nagad</strong>, <strong>Rocket</strong>, <strong>Upay</strong> or
+          <strong>other</strong>. Mobile-wallet payments require the transaction reference.</li>
+        <li>A payment can be applied to one invoice or held as an <strong>advance</strong>; the patient's
+          balance shows the net position, and an advance appears as a credit.</li>
+        <li>Invoices and payments are never deleted: <strong>void</strong> them with a reason and the record
+          stays, marked as void, with the reason and the user who voided it.</li>
+        <li><strong>Payments → Dashboard</strong> opens on today by default, with the day's collection split by
+          method. The accounting figures always separate <em>invoiced</em> revenue from <em>cash received</em>.</li>
+      </ul>
+
+      <h2 id="inventory">11. Inventory</h2>
+      <ul>
+        <li>Items hold name, category, unit, reorder level, default supplier and sale price.</li>
+        <li>Stock is received in <strong>batches</strong> with batch number, expiry date, quantity and unit
+          cost. Issuing stock consumes batches in expiry order and refuses to issue more than is on hand.</li>
+        <li><strong>Low-stock</strong> and <strong>expiring-soon</strong> warnings appear on the dashboard and in
+          the notification centre.</li>
+        <li>Every movement (purchase, usage, wastage, return, expired, adjustment) is stored permanently with
+          the user and the reason.</li>
+      </ul>
+
+      <h2 id="accounting">12. Accounting and reports</h2>
+      <ul>
+        <li>Expenses are recorded with category, date, amount, payment method and payee.</li>
+        <li><strong>Accounting</strong> shows invoiced revenue, cash collected, expenses, outstanding patient
+          balances and net cash flow for the chosen period, plus a per-method breakdown.</li>
+        <li><strong>Reports</strong> cover daily/monthly revenue, treatment revenue, expenses, outstanding
+          invoices, stock levels and the audit trail. Every figure is calculated from the transactions in the
+          database — nothing is estimated or hard-coded.</li>
+        <li>Reports and lists export to CSV (Excel) and print on A4 or A5.</li>
+      </ul>
+
+      <h2 id="staff">13. Staff and permissions</h2>
+      <p>
+        <strong>Administration → Staff</strong> holds every user account: receptionists, assistants, dentists
+        and administrators. Each account has a role, and a role is a list of permissions such as
+        <code>patients.create</code>, <code>invoices.void</code> or <code>backup.restore</code>. You can also
+        grant or deny individual permissions to a single account.
+      </p>
+      <ul>
+        <li>Permissions are enforced in the service layer, not by hiding buttons: a screen that is reached in
+          any way still cannot do what the role forbids.</li>
+        <li>A denial always wins over a grant. The last administrator account cannot be deleted or demoted, so
+          a clinic can never lock itself out.</li>
+        <li>Removing a staff member deactivates the account and keeps every record they created.</li>
+      </ul>
+
+      <h2 id="security">14. Security and the audit log</h2>
+      <ul>
+        <li><strong>Passwords:</strong> minimum 10 characters, stored with scrypt (N = 2¹⁵, r = 8, p = 1).
+          Five wrong sign-in attempts lock the account for five minutes.</li>
+        <li><strong>Auto-lock:</strong> the session locks after 5, 10, 15 or 30 minutes of inactivity
+          (configurable) or immediately with the lock button or <kbd>Ctrl</kbd>+<kbd>L</kbd>. Signing back in
+          needs the password.</li>
+        <li><strong>Audit log:</strong> who did what, when, to which record — including refused actions,
+          restores, backups, permission changes and destructive confirms. Entries are hash-chained and the
+          database refuses to update or delete them; if the chain is broken by an external tool, the integrity
+          check reports it.</li>
+        <li>Destructive actions require a typed confirmation phrase (for example
+          <code>DELETE ALL STRESS DATA</code>) and the administrator password, and take a safety backup first.</li>
+      </ul>
+
+      <h2 id="backups">15. Backups and restoring</h2>
+      <h3>Automatic</h3>
+      <p>
+        Choose an interval (7, 15 or 30 days) and a time of day. The application takes a backup on the first
+        start after that time and keeps the number of copies you configure. Backups are written as
+        <code>DentivaPro_Backup_YYYY-MM-DD-hh-mm-ss</code> folders containing the database, the clinic
+        configuration, attachments, a manifest with checksums, and a plain-text README.
+      </p>
+      <h3>Manual</h3>
+      <p>
+        <strong>Administration → Backups → Create backup</strong>. Choose whether attachments are included,
+        then optionally <strong>Copy to…</strong> to place the folder on a USB drive or a network share. Take a
+        manual backup before and after any major change.
+      </p>
+      <h3>Verifying</h3>
+      <p>
+        <strong>Verify</strong> re-checks every checksum, opens the database, runs SQLite's integrity check and
+        verifies the audit chain. A backup that fails verification is reported with the exact problem. The same
+        check is available outside the application:
+        <code>node scripts/verify-backup.mjs "&lt;backup folder&gt;"</code>.
+      </p>
+      <h3>Restoring</h3>
+      <ol>
+        <li>Open <strong>Administration → Backups</strong> and choose <strong>Restore</strong> next to the
+          backup.</li>
+        <li>Type the confirmation phrase <code>RESTORE BACKUP</code> and enter your password.</li>
+        <li>The application verifies the chosen backup, takes a <em>pre-restore</em> backup of the current data,
+          stages the new database, switches over, re-verifies and only then reports success.</li>
+        <li>If anything fails it rolls back to the data you had, keeps the pre-restore backup and records the
+          failure in the audit log. Nothing is ever silently lost.</li>
+        <li>After a restore everybody must sign in again, because the user list came from the restored file.</li>
+      </ol>
+
+      <h2 id="settings">16. Settings and data management</h2>
+      <ul>
+        <li><strong>Clinic</strong> — name, address, phones, e-mail, logo, footer quote for printouts.</li>
+        <li><strong>Clinical lists</strong> — the options offered for chief complaints, examination findings,
+          medicine types and timings, advice and duration units. Your clinic can rename, add or deactivate
+          entries without touching the built-in lists.</li>
+        <li><strong>Printing</strong> — paper size per document, printer profiles, copies.</li>
+        <li><strong>Security</strong> — auto-lock interval, password policy reminders, session behaviour.</li>
+        <li><strong>Backups</strong> — automatic schedule, retention, backup folder.</li>
+        <li><strong>Data</strong> — open the data folder, run a full integrity check, export data (CSV), and see
+          the database size.</li>
+        <li><strong>Diagnostics</strong> — recent log entries and “Export logs” to send a bundle to support.
+          Logs are rotated automatically and never contain passwords.</li>
+      </ul>
+
+      <h2 id="troubleshooting">17. Troubleshooting</h2>
+      <table>
+        <tr><th>Symptom</th><th>What to do</th></tr>
+        <tr>
+          <td>The application will not start</td>
+          <td>Restart the computer, then start Dentiva Pro again. If it still fails, open
+            <code>%APPDATA%\Dentiva Pro\Logs</code>, find the newest file and use
+            <strong>Diagnostics → Export logs</strong> from another account or send the file to support.</td>
+        </tr>
+        <tr>
+          <td>A page looks empty</td>
+          <td>The filter above the list may exclude everything (for example a custom date range in the future).
+            Clear the filter and reload the page.</td>
+        </tr>
+        <tr>
+          <td>Bengali text prints as boxes</td>
+          <td>The bundled Noto Sans Bengali font is used automatically. Make sure you print through
+            Dentiva Pro's preview rather than copying text into another program.</td>
+        </tr>
+        <tr>
+          <td>Nothing prints / the wrong printer is used</td>
+          <td>Check Settings → Printing: the document type must have a printer profile, and the printer must be
+            online and installed in Windows.</td>
+        </tr>
+        <tr>
+          <td>“Your role does not allow this action”</td>
+          <td>Ask an administrator to grant the permission in Administration → Staff, or sign in with an
+            account that has it.</td>
+        </tr>
+        <tr>
+          <td>A restore was refused</td>
+          <td>The backup failed verification, or the confirmation phrase or password was wrong. The refusal is
+            recorded in the audit log along with the reason.</td>
+        </tr>
+        <tr>
+          <td>Automatic backup did not run today</td>
+          <td>Automatic backups run at the configured time on the first start after it, and only when the
+            interval has elapsed. Use <strong>Create backup</strong> for an immediate copy.</td>
+        </tr>
+      </table>
+
+      <h2 id="about-product">18. Licence, version and third-party notices</h2>
+      <p>
+        <strong>Administration → About</strong> shows the product name, version, build number, commit, build
+        date, database path, log path, backup folder, the licence (“Proprietary — single-clinic licence”), and
+        the full list of third-party components with their licences (also shipped as
+        <code>THIRD-PARTY-NOTICES.txt</code> next to the program).
+      </p>
+      <p>Dentiva Pro is built by <strong>Shohan Khan</strong> — helloiamshohan@gmail.com.</p>
+
+      <footer>
+        Dentiva Pro 1.0.0 — User guide generated for the shipped product. Copyright © 2026 Shohan Khan. All
+        rights reserved. This guide describes the behaviour of the application; where a screen and this text
+        disagree, the application is the source of truth and the guide is updated with the next release.
+      </footer>
+    </div>
+  </body>
+</html>
