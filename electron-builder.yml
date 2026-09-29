@@ -1,0 +1,65 @@
+appId: com.dentivapro.desktop
+productName: Dentiva Pro
+copyright: 'Copyright (c) 2026 Shohan Khan. All rights reserved.'
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.{map,md,ts,tsx}'
+  - '!node_modules/**/{test,tests,__tests__,doc,docs,example,examples}/**'
+
+asar: true
+asarUnpack:
+  - node_modules/better-sqlite3/**
+
+extraResources:
+  - from: assets/fonts
+    to: fonts
+    filter: ['**/*']
+  - from: assets/branding
+    to: branding
+    filter: ['**/*']
+  - from: docs/user-guide
+    to: user-guide
+    filter: ['**/*.md']
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: DentivaPro-Setup-${version}-${arch}.${ext}
+  publisherName: Shohan Khan
+  legalTrademarks: Dentiva Pro
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Dentiva Pro
+  menuCategory: false
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  deleteAppDataOnUninstall: false
+  include: build/installer.nsh
+  differentialPackage: false
+  warnIfPackageWithArm: false
+
+portable:
+  artifactName: DentivaPro-Portable-${version}-${arch}.${ext}
+
+linux:
+  target:
+    - dir
+  category: Office
+  icon: build/icons
