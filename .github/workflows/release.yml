@@ -24,6 +24,12 @@ jobs:
     name: Build, verify and publish the Windows installer
     runs-on: windows-latest
     timeout-minutes: 60
+    # windows-latest defaults to PowerShell, where the POSIX guards below ([ -z ... ], ${VAR})
+    # are not valid. Every script step in this job is bash, which also makes the release behave the
+    # same as the CI jobs an operator has already seen pass.
+    defaults:
+      run:
+        shell: bash
     env:
       DENTIVA_ACTIVATION_CODE: ${{ secrets.DENTIVA_ACTIVATION_CODE }}
     steps:
