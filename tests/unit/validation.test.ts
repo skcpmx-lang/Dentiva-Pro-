@@ -131,7 +131,7 @@ describe('credentials and permissions', () => {
   })
 
   it('requires an activation code and a login name', () => {
-    expect(passes(activationSchema, { code: '1516591935015165' })).toBe(true)
+    expect(passes(activationSchema, { code: 'fixture-code-0001' })).toBe(true)
     expect(issues(activationSchema, { code: '' })).not.toHaveLength(0)
     expect(passes(loginSchema, { username: 'admin', password: 'secret' })).toBe(true)
     expect(issues(loginSchema, { username: '', password: 'secret' })).not.toHaveLength(0)
@@ -153,7 +153,7 @@ describe('setup and clinic', () => {
 
   it('accepts a complete setup payload and refuses one without an administrator', () => {
     const setup = {
-      activationCode: '1516591935015165',
+      activationCode: 'fixture-code-0001',
       clinic,
       dentists: [
         {

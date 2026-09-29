@@ -640,6 +640,7 @@ export function Shell() {
           <div className="command-palette" role="dialog" aria-label="Search and commands">
             <input
               className="command-palette__input"
+              aria-label="Search patients, invoices, prescriptions and commands"
               value={searchTerm}
               autoFocus
               placeholder="Search patients, invoices, prescriptions or type a command…"
