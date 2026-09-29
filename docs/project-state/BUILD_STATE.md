@@ -19,7 +19,7 @@ last_updated: 2026-09-30
 |---|---|
 | Requirements, architecture, ADRs, DB design, RBAC, design system, print, backup, testing docs | **Complete** |
 | Project scaffolding (Electron + TS + React + SQLite + electron-builder) | **Complete** |
-| Database schema + migrations + repositories | **Complete** (migrations 0001–0003; fixture/checksum tests pending) |
+| Database schema + migrations + repositories | **Complete** (migrations 0001–0005, checksum/append-only/fixture tests in `security-hardening.test.ts`) |
 | Services + IPC router (business-layer authorization) | **Complete** (~140 channels, every service checks permissions) |
 | Renderer design system + shell + feature screens | **Complete** (prescriptions screen runs on the real channels; verified through the router in the preview harness) |
 | Unit tests | **137 passing** (9 files) — money 16, date 15, dental/ids/csv 17, printing 21, security 16, validation 20, session/activation 14, window state 8, renderer components 10 |
@@ -37,8 +37,8 @@ last_updated: 2026-09-30
 ## Machine-readable task state
 
 ```yaml
-current_task: §113 pre-release audits, traceability matrix and release-readiness document shipped; next is the packaged Windows installer run on windows-latest
-next_task: Run the CI and Release workflows on windows-latest (activate the DENTIVA_ACTIVATION_CODE repository secret first), then complete docs/release/RELEASE_READINESS.md with the executed evidence
+current_task: Operations coverage finished (destructive safeguards, full reset, patient date filters, notifications, setup validation, CSV patient import with dry run) and the two production defects it exposed are fixed; the operations and import suites are green locally
+next_task: Build and verify the real installer with the Release workflow on windows-latest (the DENTIVA_ACTIVATION_CODE repository secret must exist first), then record the executed evidence in docs/release/RELEASE_READINESS.md
 completed:
   - docs/* (requirements, architecture, ADRs, database, security, ux, printing, backup-restore, testing, compliance, project-state, user guide)
   - src/shared/** (money incl. fromDecimalString, date, ids, dental, csv, permissions, validation, constants, printing models)
@@ -53,6 +53,7 @@ completed:
   - GitHub Actions ci.yml + release.yml, Playwright config + e2e suites
 in_progress:
   - Windows-only evidence: Electron end-to-end suites, installer build/install/uninstall, print matrix and DPI screenshots (everything else is verified locally or by the CI quality/maintenance jobs)
+  - The `integration`/`e2e-windows`/Release jobs stay red until the repository owner adds the DENTIVA_ACTIVATION_CODE secret; the sandbox token cannot create it, and the fixed offline secret must not live in the repository
 failed_tests: []
 known_issues:
   - Electron cannot run in the development sandbox (no binary), so E2E, PDF fidelity, print matrix and DPI checks only run on windows-latest.
@@ -152,10 +153,12 @@ had caught. All four are fixed, with integration coverage:
   `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install` before working.
 * The activation code is supplied through the environment (`DENTIVA_ACTIVATION_CODE`) for tests and the
   preview harness; it is deliberately absent from the repository.
-* **Repository secret to configure:** add `DENTIVA_ACTIVATION_CODE` under
-  *Settings → Secrets and variables → Actions → New repository secret*. Until it exists, the `integration`
-  and `e2e-windows` jobs fail on purpose with an explanatory message instead of reporting a green build in
-  which 40 of 46 integration tests (and every Electron acceptance test) were skipped.
+* **Repository secret to configure (blocking the release):** add `DENTIVA_ACTIVATION_CODE` under
+  *Settings → Secrets and variables → Actions → New repository secret*. Until it exists, the `integration`,
+  `e2e-windows` and Release jobs fail on purpose with an explanatory message instead of reporting a green
+  build in which the activation-dependent tests (and every Electron acceptance test) were skipped. The
+  installer artifact and the Windows evidence cannot be produced without it; the automated token used here
+  can read and write the repository but cannot write secrets.
 
 ## How to resume in 5 steps
 
