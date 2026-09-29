@@ -145,14 +145,21 @@ Test locations: `tests/unit/**`, `tests/integration/**`, `tests/e2e/**`.
 
 ```bash
 npm run lint && npm run typecheck          # static checks
-npm run test:unit                          # 48 unit tests
+npm run test:unit                          # 48 unit tests (no secret needed)
 DENTIVA_ACTIVATION_CODE=… npm run test:integration   # 46 integration tests
 npm run test:coverage                      # both suites with coverage
-npm run test:e2e                           # Electron suites (Windows)
+DENTIVA_ACTIVATION_CODE=… npm run test:e2e # Electron suites (Windows)
 node scripts/seed-stress-data.mjs          # performance numbers + report
 npm run audit:deps && npm run licenses     # dependency and licence evidence
 npm run verify:installer                   # artifact evidence after packaging
 ```
+
+**The activation secret is a hard prerequisite.** The verifier is bound to a fixed offline secret, so every
+integration test that completes setup needs it. Locally the affected suites report skips; in GitHub Actions
+the `integration` and `e2e-windows` jobs **fail with an explicit message** when the repository secret
+`DENTIVA_ACTIVATION_CODE` is missing, so a green pipeline always means the suites really ran. At the time of
+this review the secret is **not yet configured**, so no integration or end-to-end row is marked Pass on CI
+evidence — those Pass rows come from local runs with the secret in the environment.
 
 Manual evidence (print matrix, DPI screenshots, clean-machine install/uninstall, multi-printer output) is
 collected in `docs/release/evidence/` while working through `docs/release/RELEASE_READINESS.md`.

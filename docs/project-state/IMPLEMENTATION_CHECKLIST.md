@@ -103,10 +103,10 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 |---|---|---|---|
 | 8.1 | Unit tests | **Done** (first batch) | 48 tests across money, date, ids, dental, csv. Remaining: password, permissions, printing, validation, errors |
 | 8.2 | Integration tests over the real service layer | **Done** (first batch) | 46 tests: setup/auth, clinical, billing, backup/audit |
-| 8.3 | End-to-end acceptance suite | **Pending (written)** | `tests/e2e/*` — first execution on windows-latest |
+| 8.3 | End-to-end acceptance suite | **Pending (written)** | `tests/e2e/*` runs on windows-latest; the job is gated on the `DENTIVA_ACTIVATION_CODE` secret, so it has not executed yet |
 | 8.4 | Stress dataset and measured performance | **Done** | `scripts/seed-stress-data.mjs`, `docs/testing/PERFORMANCE_MEASUREMENTS.md` |
 | 8.5 | Dependency and licence audit + notices | **Done** | `npm run audit:deps`, `npm run licenses`; CI checks freshness |
-| 8.6 | CI pipeline (lint, types, tests, build, tools, E2E) | **Done** (authored) | `.github/workflows/ci.yml`; the first run happens when the branch is pushed |
+| 8.6 | CI pipeline (lint, types, tests, build, tools, E2E) | **Partial** | `.github/workflows/ci.yml` runs on GitHub: the lint/types/unit/build job and the maintenance-tools job are green. The integration and E2E jobs fail on purpose until the `DENTIVA_ACTIVATION_CODE` repository secret is added |
 | 8.7 | Windows installer build | **Pending** | `release.yml` + `npm run verify:installer`; requires windows-latest |
 | 8.8 | Clean-machine install / uninstall / data-preservation test | **Pending** | Checklist in `docs/release/` to be completed with evidence |
 | 8.9 | Release readiness document | **Pending** | `docs/release/RELEASE_READINESS.md` |

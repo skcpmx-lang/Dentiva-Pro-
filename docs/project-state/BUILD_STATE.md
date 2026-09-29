@@ -27,7 +27,7 @@ last_updated: 2026-09-29
 | End-to-end (Electron) suites | **Written, first run pending on windows-latest** |
 | Performance measurement (NFR-003) | **Measured** — `docs/testing/PERFORMANCE_MEASUREMENTS.md` |
 | Dependency/licence audit + third-party notices | **Complete** (`npm run audit:deps`, `npm run licenses`) |
-| GitHub Actions CI + release pipeline | **Authored** — first run pending on push |
+| GitHub Actions CI + release pipeline | **Running** — quality, maintenance and build jobs pass on GitHub; the integration and end-to-end jobs need the `DENTIVA_ACTIVATION_CODE` repository secret (not yet configured, see below) |
 | Windows installer build, clean-machine test | **Pending** (windows-latest) |
 | Release (GitHub Release or `dist/`) | **Pending** |
 
@@ -55,8 +55,8 @@ known_issues:
   - Electron cannot run in the development sandbox (no binary), so E2E, PDF fidelity, print matrix and DPI checks only run on windows-latest.
   - Empty folders kept out of git (for example an empty attachments directory) must be created by the code at runtime; do not re-add committed placeholder files.
 pending_fixes: []
-last_successful_build: green (electron-vite build, out/renderer ~1.45 MB js + 49 kB css)
-last_successful_test: 94 passing (48 unit + 46 integration), plus the stress run and both verification scripts
+last_successful_build: green (electron-vite build, out/renderer ~1.45 MB js + 49 kB css; GitHub Actions quality job green)
+last_successful_test: 94 passing locally (48 unit + 46 integration) with DENTIVA_ACTIVATION_CODE set; without it 6 pass and 40 skip by design. GitHub CI: lint/types/build/unit + maintenance jobs green, integration + e2e waiting for the secret.
 ```
 
 ## Environment notes (important for resuming)
@@ -75,6 +75,10 @@ last_successful_test: 94 passing (48 unit + 46 integration), plus the stress run
   `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install` before working.
 * The activation code is supplied through the environment (`DENTIVA_ACTIVATION_CODE`) for tests and the
   preview harness; it is deliberately absent from the repository.
+* **Repository secret to configure:** add `DENTIVA_ACTIVATION_CODE` under
+  *Settings → Secrets and variables → Actions → New repository secret*. Until it exists, the `integration`
+  and `e2e-windows` jobs fail on purpose with an explanatory message instead of reporting a green build in
+  which 40 of 46 integration tests (and every Electron acceptance test) were skipped.
 
 ## How to resume in 5 steps
 

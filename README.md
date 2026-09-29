@@ -96,6 +96,18 @@ npm run test:e2e      # Playwright Electron acceptance tests (Windows)
 npm run audit:deps    # dependency + licence audit
 ```
 
+The activation verifier is bound to a fixed offline secret, so the integration and end-to-end suites
+need that secret to run:
+
+```bash
+DENTIVA_ACTIVATION_CODE=... npm run test:integration
+```
+
+Without it those tests are **reported as skipped**, and `.github/workflows/ci.yml` refuses to run the
+integration and end-to-end jobs, so a green pipeline can never mean "the tests were skipped".
+The code itself is deliberately not stored in the repository; for CI add it as the repository secret
+`DENTIVA_ACTIVATION_CODE` (Settings -> Secrets and variables -> Actions -> New repository secret).
+
 ## Release
 
 ```bash
