@@ -1,0 +1,147 @@
+name: CI
+
+# Continuous integration for the Windows desktop product. Linux runners cover the fast checks
+# (lint, types, unit and integration tests, production build); the Electron end-to-end suite runs on
+# windows-latest, because that is the platform the application ships for.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Set this repository secret to the activation code so the setup/activation integration tests run.
+  # Without it those tests are skipped, and the rest of the suite still runs.
+  DENTIVA_ACTIVATION_CODE: ${{ secrets.DENTIVA_ACTIVATION_CODE }}
+
+jobs:
+  quality:
+    name: Lint, types, unit tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check (main process)
+        run: npm run typecheck:node
+
+      - name: Type check (renderer)
+        run: npm run typecheck:web
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Build the application bundles
+        run: npm run build:app
+
+      - name: Check the build produced the expected output
+        run: |
+          test -f out/main/index.js
+          test -f out/preload/index.js
+          test -f out/renderer/index.html
+          echo "main/preload/renderer bundles present"
+
+      - name: Upload the build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dentiva-build-${{ github.sha }}
+          path: out/
+          retention-days: 14
+
+  integration:
+    name: Integration tests over the real service layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Integration tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: dentiva-coverage-${{ github.sha }}
+          path: coverage/
+          retention-days: 14
+
+  maintenance-tools:
+    name: Maintenance tools (audit, notices, backup verifier, stress run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency and licence audit
+        run: npm run audit:deps
+
+      - name: Regenerate the third-party notices and confirm they are current
+        run: |
+          npm run licenses
+          git diff --exit-code docs/compliance/THIRD-PARTY-NOTICES.md docs/compliance/THIRD-PARTY-NOTICES.txt
+
+      - name: Performance run on a reduced dataset (budgets must hold)
+        run: node scripts/seed-stress-data.mjs --scale 0.1 --root "$RUNNER_TEMP/stress" --no-report
+
+  e2e-windows:
+    name: End-to-end (Electron, windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the application
+        run: npm run build:app
+
+      - name: End-to-end acceptance tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dentiva-e2e-results
+          path: |
+            test-results/
+          retention-days: 14
