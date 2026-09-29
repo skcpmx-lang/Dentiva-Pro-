@@ -265,17 +265,20 @@ export class AuthService {
     const role = this.deps.roles.findById(input.roleId)
     if (!role) throw validationError('Choose a valid role.', [{ field: 'roleId', message: 'Unknown role.' }])
 
-    // Lock-out protection: keep at least one active administrator and one holder of each critical permission.
+    // Lock-out protection: the clinic must never lose its last administrator, and it must never lose
+    // the ability to manage accounts at all. Both are checked against the users that remain.
     const losingAdmin = existing.roleId !== input.roleId || !input.isActive
     if (losingAdmin) {
       const adminRole = this.deps.roles.findByCode('administrator')
-      if (
-        adminRole &&
-        existing.roleId === adminRole.id &&
-        this.countEffectiveHolders(adminRole.id, 'users.manage', id) === 0
-      ) {
+      const remaining = this.countEffectiveHolders(adminRole?.id ?? null, 'users.manage', id)
+      if (adminRole && existing.roleId === adminRole.id && remaining.administrators === 0) {
         throw conflict(
           'At least one active administrator must remain. Create or promote another administrator first.'
+        )
+      }
+      if (remaining.managers === 0) {
+        throw conflict(
+          'At least one active user must be able to manage accounts. Give another user the users.manage permission first.'
         )
       }
     }
@@ -302,10 +305,21 @@ export class AuthService {
     return this.deps.users.findById(id) as UserSummary
   }
 
-  private countEffectiveHolders(roleId: number, permission: PermissionCode, excludingUserId: number): number {
+  /**
+   * Counts the active users that would remain after the change, split into those sitting in the given
+   * role (`administrators`) and those that effectively hold the permission (`managers`). Overrides are
+   * honoured, so a denied user does not count as a holder even when the role would grant the code.
+   */
+  private countEffectiveHolders(
+    roleId: number | null,
+    permission: PermissionCode,
+    excludingUserId: number
+  ): { administrators: number; managers: number } {
     const users = this.deps.users.list().filter((user) => user.id !== excludingUserId && user.isActive)
-    let count = 0
+    let administrators = 0
+    let managers = 0
     for (const user of users) {
+      if (roleId != null && user.roleId === roleId) administrators += 1
       const denied = user.overrides.some(
         (override) => override.code === permission && override.effect === 'deny'
       )
@@ -314,10 +328,9 @@ export class AuthService {
       const allowed =
         rolePermissions.includes(permission) ||
         user.overrides.some((override) => override.code === permission && override.effect === 'allow')
-      if (allowed) count += 1
+      if (allowed) managers += 1
     }
-    void roleId
-    return count
+    return { administrators, managers }
   }
 
   // -------------------------------------------------------------------------------------------
