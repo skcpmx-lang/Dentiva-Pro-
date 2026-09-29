@@ -11,6 +11,7 @@ import type { ActivationResult, ClinicInput, DentistInput } from '@shared/types'
 import { invoke, errorMessage } from '../../lib/api'
 import { useApp } from '../../app/state'
 import { Button, Checkbox, Field, TextArea, TextInput } from '../../components/ui'
+import { BrandMark } from '../../components/BrandMark'
 
 const STEPS = ['Activation', 'Clinic', 'Dentists', 'Administrator', 'Review'] as const
 type Step = (typeof STEPS)[number]
@@ -198,9 +199,7 @@ export function SetupWizard() {
     <div className="full-screen" style={{ alignItems: 'flex-start', paddingTop: 'var(--space-10)' }}>
       <div className="auth-card auth-card--wide">
         <div className="auth-card__brand">
-          <span className="auth-card__brand-mark" aria-hidden="true">
-            DP
-          </span>
+          <BrandMark />
           <div>
             <h2 style={{ marginBottom: 2 }}>Set up Dentiva Pro</h2>
             <span className="auth-card__hint">

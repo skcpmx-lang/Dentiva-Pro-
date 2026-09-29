@@ -20,6 +20,7 @@ import {
 import type { Notification, SearchResults } from '@shared/types'
 import { invoke, errorMessage } from '../lib/api'
 import { useApp } from './state'
+import { BrandMark } from '../components/BrandMark'
 import { ROUTES, SIDEBAR_GROUPS, canSeeRoute, routeByPath } from './routes'
 import { Button, Drawer, EmptyState, LoadingState, Modal, Toaster } from '../components/ui'
 import { formatDate, formatRelativeDate, notificationCategoryLabel, todayIso } from '../lib/format'
@@ -300,9 +301,7 @@ export function Shell() {
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header__brand">
-          <span className="app-header__logo" aria-hidden="true">
-            DP
-          </span>
+          <BrandMark className="app-header__logo" />
           <span className="app-header__title">
             <strong>Dentiva Pro</strong>
             <span>{app.clinic?.name ?? 'Dental clinic'}</span>

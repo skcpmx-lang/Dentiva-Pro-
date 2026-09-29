@@ -211,6 +211,15 @@ code,
   min-width: var(--sidebar-width);
 }
 
+/* The application mark is an image (assets/branding/logo.svg); the surrounding classes keep sizing it. */
+.brand-mark__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: inherit;
+}
+
 .app-header__logo {
   display: grid;
   place-items: center;

@@ -3,6 +3,7 @@ import { Lock, ShieldCheck } from 'lucide-react'
 import { invoke, isApiError, errorMessage } from '../../lib/api'
 import { useApp } from '../../app/state'
 import { Button, TextInput } from '../../components/ui'
+import { BrandMark } from '../../components/BrandMark'
 
 /**
  * Sign-in screen. Failed attempts are counted by the main process, which also applies the lock-out.
@@ -78,9 +79,7 @@ export function LoginScreen() {
     <div className="full-screen">
       <div className="auth-card">
         <div className="auth-card__brand">
-          <span className="auth-card__brand-mark" aria-hidden="true">
-            DP
-          </span>
+          <BrandMark />
           <div>
             <h2 style={{ marginBottom: 2 }}>Dentiva Pro</h2>
             <span className="auth-card__hint">{app.clinic?.name ?? 'Dental clinic management'}</span>

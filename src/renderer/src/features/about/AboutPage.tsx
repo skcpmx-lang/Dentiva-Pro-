@@ -30,6 +30,7 @@ import {
   Tabs,
   TextInput
 } from '../../components/ui'
+import { BrandMark } from '../../components/BrandMark'
 import { useQuery } from '../../lib/hooks'
 import { filesize, formatTimestamp, titleCase } from '../../lib/format'
 
@@ -66,13 +67,7 @@ export function AboutPage() {
           <>
             <Card>
               <div className="toolbar" style={{ alignItems: 'flex-start', gap: 'var(--space-4)' }}>
-                <span
-                  className="auth-card__brand-mark"
-                  style={{ width: 64, height: 64, fontSize: 'var(--text-xl)' }}
-                  aria-hidden="true"
-                >
-                  DP
-                </span>
+                <BrandMark size={64} />
                 <div style={{ flex: 1 }}>
                   <h2 style={{ marginBottom: 4 }}>{info.data.productName}</h2>
                   <p style={{ marginTop: 0 }}>
