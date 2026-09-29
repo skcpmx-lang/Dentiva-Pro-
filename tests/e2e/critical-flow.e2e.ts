@@ -305,6 +305,9 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
     await expect(page.getByText('Amoxicillin 500 mg').first()).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText('Paracetamol 500 mg').first()).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText('If pain occurs').first()).toBeVisible()
+    // Close the detail drawer again: it covers the sidebar, and the rest of the flow navigates from there.
+    await page.getByRole('dialog').getByRole('button', { name: 'Close' }).first().click()
+    await expect(page.getByText('Amoxicillin 500 mg').first()).toBeHidden()
   })
 
   test('an invoice is raised and a payment against it is recorded', async () => {
