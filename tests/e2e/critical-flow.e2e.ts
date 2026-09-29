@@ -363,8 +363,12 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
       .getByRole('link', { name: /backup/i })
       .first()
       .click()
-    await expect(page.getByRole('button', { name: /back up now/i })).toBeVisible({ timeout: 20_000 })
-    await page.getByRole('button', { name: /back up now/i }).click()
+    // The screen offers the same action in two places (toolbar and card), so the first one is used.
+    await expect(page.getByRole('button', { name: /back up now/i }).first()).toBeVisible({ timeout: 20_000 })
+    await page
+      .getByRole('button', { name: /back up now/i })
+      .first()
+      .click()
 
     await expect(page.getByText(/backup completed/i).first()).toBeVisible({ timeout: 60_000 })
 
