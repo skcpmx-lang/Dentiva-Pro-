@@ -205,6 +205,13 @@ suite('backups', () => {
 
     // ...and the audit chain of the restored database still verifies.
     expect(harness.services.admin.auditChainStatus().valid).toBe(true)
+
+    // The notification centre records what happened, on the restored database: the safety copy and the
+    // restore itself. Nothing is stored on the database that was just replaced.
+    const notices = harness.services.clinical.listNotifications(false, 50)
+    const restoreNotice = notices.find((row) => row.category === 'restore')
+    expect(restoreNotice?.priority).toBe('warning')
+    expect(restoreNotice?.body).toContain(restored.preRestoreBackup.fileName)
   })
 
   it('refuses to restore without the typed confirmation phrase', async () => {

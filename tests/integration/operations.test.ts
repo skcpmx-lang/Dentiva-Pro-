@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { addDaysIso, todayIso } from '@shared/date'
 import { DESTRUCTIVE_PHRASES } from '@main/services/admin-service'
+import { LOGIN_POLICY } from '@shared/constants'
 import { completeSetup, createHarness, patientInput, type Harness } from './harness'
 
 const activationCode = process.env.DENTIVA_ACTIVATION_CODE ?? ''
@@ -281,6 +282,105 @@ suite('notification sweep (AT-E09)', () => {
     expect(harness.services.clinical.listNotifications(false, 50).some((row) => row.id === target.id)).toBe(
       false
     )
+  })
+})
+
+suite('the remaining notification categories (AT-E09)', () => {
+  it('reminds the front desk about a patient who has been waiting too long', () => {
+    const patient = harness.services.clinical.createPatient(patientInput({ fullName: 'Queue Patient' }))
+    const snapshot = harness.services.clinical.addToQueue({ patientId: patient.id, priority: 'normal' })
+    const entry = snapshot.entries.find((row) => row.patientId === patient.id)
+    expect(entry).toBeDefined()
+    // Arrived well before the reminder threshold: the sweep only looks at the clock.
+    harness.services.db
+      .prepare("UPDATE queue_entries SET arrived_at = datetime('now', '-95 minutes') WHERE id = ?")
+      .run(entry?.id ?? 0)
+
+    harness.services.clinical.refreshNotifications()
+    const queueNotices = harness.services.clinical
+      .listNotifications(false, 50)
+      .filter((row) => row.category === 'queue')
+    expect(queueNotices.length).toBe(1)
+    expect(queueNotices[0]?.title).toMatch(/waiting \d+ minutes/i)
+    expect(queueNotices[0]?.entityType).toBe('queue')
+
+    // The reminder is raised once per patient and threshold, so it cannot flood the centre.
+    harness.services.clinical.refreshNotifications()
+    expect(
+      harness.services.clinical.listNotifications(false, 50).filter((row) => row.category === 'queue').length
+    ).toBe(1)
+  })
+
+  it('announces every backup and warns when the schedule is overdue', async () => {
+    harness.services.admin.updateSettings({ autoBackupEnabled: true, autoBackupIntervalDays: 7 })
+    harness.services.admin.refreshBackupNotifications()
+    const overdue = harness.services.clinical
+      .listNotifications(false, 50)
+      .find((row) => /overdue/i.test(row.title))
+    expect(overdue?.category).toBe('backup')
+    expect(overdue?.priority).toBe('warning')
+
+    const record = await harness.services.admin.createBackup('manual', { includeAttachments: false })
+    const completed = harness.services.clinical
+      .listNotifications(false, 50)
+      .find((row) => row.title.includes(record.fileName))
+    expect(completed?.priority).toBe('info')
+    expect(completed?.entityType).toBe('backup')
+
+    // With a fresh backup on disk the reminder does not repeat.
+    const before = harness.services.clinical.listNotifications(false, 50).length
+    harness.services.admin.refreshBackupNotifications()
+    expect(harness.services.clinical.listNotifications(false, 50).length).toBe(before)
+  })
+
+  it('reports a failed backup instead of failing silently', async () => {
+    // The backup location (settings folder, or the data folder when none is configured) is replaced by a
+    // file: the copy cannot start, and the failure has to be reported and recorded.
+    const backupFolder = harness.services.admin.backupFolderPath()
+    rmSync(backupFolder, { recursive: true, force: true })
+    writeFileSync(backupFolder, 'this is a file, not a folder', 'utf8')
+
+    await expect(
+      harness.services.admin.createBackup('manual', { includeAttachments: false })
+    ).rejects.toThrow(/is a file, not a folder/i)
+
+    // The failed attempt is in the backup register as well, so the history is honest.
+    expect(harness.services.admin.backups().some((record) => record.status === 'failed')).toBe(true)
+
+    const failure = harness.services.clinical
+      .listNotifications(false, 50)
+      .find((row) => row.category === 'backup' && row.priority === 'critical')
+    expect(failure?.title).toMatch(/backup failed/i)
+  })
+
+  it('raises security notices for failed sign-ins and for a locked account', () => {
+    for (let attempt = 1; attempt <= LOGIN_POLICY.maxFailedAttempts; attempt += 1) {
+      expect(() => harness.services.auth.login('admin', 'not-the-password')).toThrow(/not correct/i)
+    }
+    const security = harness.services.clinical
+      .listNotifications(false, 50)
+      .filter((row) => row.category === 'security')
+    expect(security.length).toBeGreaterThan(0)
+    expect(security.some((row) => row.priority === 'critical')).toBe(true)
+
+    // A locked account refuses the next attempt and says how long to wait.
+    expect(() => harness.services.auth.login('admin', 'not-the-password')).toThrow(
+      /too many failed attempts/i
+    )
+  })
+
+  it('raises a system notice when the integrity check finds a problem', () => {
+    // Forge an audit row the way an external tool would, which breaks the hash chain.
+    harness.services.db.exec('DROP TRIGGER trg_audit_no_update')
+    harness.services.db.prepare("UPDATE audit_log SET summary = 'tampered' WHERE id = 1").run()
+
+    const report = harness.services.admin.runIntegrity(true)
+    expect(report.ok).toBe(false)
+    const system = harness.services.clinical
+      .listNotifications(false, 50)
+      .find((row) => row.category === 'system')
+    expect(system?.priority).toBe('critical')
+    expect(system?.title).toMatch(/integrity/i)
   })
 })
 

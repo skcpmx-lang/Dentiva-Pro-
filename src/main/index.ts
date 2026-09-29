@@ -605,6 +605,7 @@ function refreshNotifications(): void {
   if (!services || services.session.sessionState !== 'authenticated') return
   try {
     services.clinical.refreshNotifications()
+    services.admin.refreshBackupNotifications()
     emit({ type: 'notifications:changed', payload: { unread: services.clinical.notificationCount() } })
   } catch (error) {
     logger?.warn(`Notification refresh failed: ${String(error)}`)

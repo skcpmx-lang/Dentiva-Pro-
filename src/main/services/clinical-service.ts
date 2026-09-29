@@ -1492,6 +1492,31 @@ export class ClinicalService {
         dedupeKey: `expiring-${batch.itemId}-${batch.expiryDate}`
       })
     }
+    if (settings.queueWaitingReminderMinutes > 0) {
+      const snapshot = this.deps.queue.snapshot()
+      for (const entry of snapshot.entries) {
+        if (entry.status !== 'waiting') continue
+        const waitedMinutes = Math.floor(
+          (Date.now() - Date.parse(entry.arrivedAt.replace(' ', 'T'))) / 60_000
+        )
+        if (!Number.isFinite(waitedMinutes) || waitedMinutes < settings.queueWaitingReminderMinutes) {
+          continue
+        }
+        this.deps.notifications.create({
+          category: 'queue',
+          priority: waitedMinutes >= settings.queueWaitingReminderMinutes * 2 ? 'warning' : 'info',
+          title: `Waiting ${waitedMinutes} minutes: ${entry.patientName}`,
+          body: `${entry.patientCode} is still waiting to be called${
+            entry.dentistName ? ` for ${entry.dentistName}` : ''
+          }.`,
+          entityType: 'queue',
+          entityId: entry.id,
+          actionType: 'open_queue',
+          // One reminder per queued patient per threshold, so a busy morning cannot flood the centre.
+          dedupeKey: `queue-waiting-${entry.id}-${settings.queueWaitingReminderMinutes}`
+        })
+      }
+    }
     if (settings.notifyOutstandingBalances) {
       for (const row of this.deps.invoices.outstanding().slice(0, 10)) {
         if (row.outstandingPoisha < settings.outstandingBalanceThresholdPoisha) continue

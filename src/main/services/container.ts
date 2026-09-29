@@ -146,6 +146,7 @@ export function createServices(options: ContainerOptions): Services {
     users,
     roles,
     audit,
+    notifications,
     session,
     appVersion: options.appVersion
   })
@@ -201,6 +202,7 @@ export function createServices(options: ContainerOptions): Services {
     printerProfiles,
     counters,
     audit,
+    notifications,
     patients,
     invoices,
     prescriptions,

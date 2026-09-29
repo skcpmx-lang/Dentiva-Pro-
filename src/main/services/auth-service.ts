@@ -14,7 +14,7 @@ import { CRITICAL_PERMISSIONS } from '@shared/permissions'
 import type { LoginResult, RoleSummary, SessionSnapshot, UserInput, UserSummary } from '@shared/types'
 import type { SqliteDatabase } from '../db/connection'
 import type { RoleRepository, UserRepository } from '../db/repositories-core'
-import type { AuditRepository } from '../db/repositories-clinical'
+import type { AuditRepository, NotificationRepository } from '../db/repositories-clinical'
 import { passwordIssues, verifyPassword } from '../security/password'
 import type { SessionManager } from '../security/session'
 
@@ -23,6 +23,7 @@ export interface AuthServiceDeps {
   users: UserRepository
   roles: RoleRepository
   audit: AuditRepository
+  notifications: NotificationRepository
   session: SessionManager
   appVersion: string
 }
@@ -101,6 +102,13 @@ export class AuthService {
         severity: 'warning',
         actor: { userId: user.id, username: user.username }
       })
+      this.notify({
+        category: 'security',
+        priority: 'critical',
+        title: `Account locked: ${user.username}`,
+        body: `Sign-in was refused for ${minutes} more minute(s) after too many failed attempts.`,
+        dedupeKey: `security-locked-${user.username}-${user.lockedUntilEpoch}`
+      })
       throw new AppError('LOCKED_OUT', `Too many failed attempts. Try again in ${minutes} minute(s).`)
     }
 
@@ -114,6 +122,20 @@ export class AuthService {
       this.audit('security.login_failed', `Failed sign-in attempt for "${user.username}"`, {
         severity: 'warning',
         actor: { userId: user.id, username: user.username }
+      })
+      const state = this.deps.db
+        .prepare('SELECT failed_attempts, locked_until_epoch FROM users WHERE id = ?')
+        .get(user.id) as { failed_attempts: number; locked_until_epoch: number | null } | undefined
+      const attempts = state?.failed_attempts ?? 1
+      const locked = Boolean(state?.locked_until_epoch && state.locked_until_epoch > nowEpochMs())
+      this.notify({
+        category: 'security',
+        priority: locked ? 'critical' : 'warning',
+        title: `Failed sign-in for ${user.username}`,
+        body: locked
+          ? `Attempt ${attempts} of ${LOGIN_POLICY.maxFailedAttempts} — the account is locked for ${LOGIN_POLICY.lockoutMinutes} minute(s).`
+          : `Attempt ${attempts} of ${LOGIN_POLICY.maxFailedAttempts} before the account is locked.`,
+        dedupeKey: `security-login-failed-${user.username}-${attempts}`
       })
       throw new AppError('UNAUTHENTICATED', 'The username or password is not correct.')
     }
@@ -138,6 +160,18 @@ export class AuthService {
     )
     this.audit('security.login', `Signed in as ${user.username}`, { entityType: 'user', entityId: user.id })
     return { snapshot, mustChangePassword: user.mustChangePassword }
+  }
+
+  /**
+   * Raises a notification about an authentication event. Sign-in must never fail because a courtesy notice
+   * could not be stored, so failures are swallowed here.
+   */
+  private notify(input: Parameters<NotificationRepository['create']>[0]): void {
+    try {
+      this.deps.notifications.create(input)
+    } catch {
+      // Ignored on purpose: the audit entry is the authoritative record of what happened.
+    }
   }
 
   logout(): void {

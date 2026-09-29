@@ -292,6 +292,7 @@ export function Shell() {
       patient: '/patients',
       prescription: '/prescriptions',
       inventory_item: '/inventory',
+      queue: '/queue',
       backup: '/backups'
     }
     return map[notification.entityType] ?? null

@@ -396,6 +396,14 @@ export function SettingsPage() {
               }
               hint="Patients owing more than this are flagged on the dashboard."
             />
+            <TextInput
+              label="Queue waiting reminder (minutes)"
+              value={String(draft.queueWaitingReminderMinutes)}
+              onValueChange={(value) =>
+                patch({ queueWaitingReminderMinutes: Math.max(0, Number(value.replace(/\D/g, '') || 0)) })
+              }
+              hint="The front desk is reminded when a queued patient has waited this long. 0 turns it off."
+            />
           </div>
           <Checkbox
             label="Notify about missed appointments"

@@ -94,6 +94,14 @@ export const LOCK_TIMEOUT_OPTIONS = [5, 10, 15, 30] as const
 export type LockTimeoutMinutes = (typeof LOCK_TIMEOUT_OPTIONS)[number]
 
 export const BACKUP_INTERVAL_OPTIONS = [7, 15, 30] as const
+
+/** Human wording for `BackupRecord.trigger`, so a notification never shows a raw enum value. */
+export const BACKUP_TRIGGER_LABELS = {
+  manual: 'Manual backup',
+  auto: 'Automatic backup',
+  pre_destructive: 'Safety backup before a destructive action',
+  pre_restore: 'Safety backup before a restore'
+} as const
 export type BackupIntervalDays = (typeof BACKUP_INTERVAL_OPTIONS)[number]
 
 /**
@@ -1139,6 +1147,8 @@ export interface AppSettingsShape {
   notifyMissedAppointments: boolean
   notifyOutstandingBalances: boolean
   outstandingBalanceThresholdPoisha: number
+  /** Remind the front desk when a queued patient has waited this long (0 turns the reminder off). */
+  queueWaitingReminderMinutes: number
   // Security
   autoLockMinutes: number
   requirePasswordOnDestructive: boolean
@@ -1186,6 +1196,7 @@ export const DEFAULT_SETTINGS: AppSettingsShape = {
   notifyMissedAppointments: true,
   notifyOutstandingBalances: true,
   outstandingBalanceThresholdPoisha: 0,
+  queueWaitingReminderMinutes: 30,
   autoLockMinutes: 10,
   requirePasswordOnDestructive: true,
   loginMaxAttempts: 5,

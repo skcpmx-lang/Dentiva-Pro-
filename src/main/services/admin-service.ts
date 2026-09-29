@@ -21,7 +21,7 @@ import { basename, extname, join, relative, resolve, sep } from 'node:path'
 
 import { formatAge, nowSql, todayIso } from '@shared/date'
 import { AppError, conflict, notFound, validationError } from '@shared/errors'
-import { DEFAULT_SETTINGS, type AppSettingsShape } from '@shared/constants'
+import { BACKUP_TRIGGER_LABELS, DEFAULT_SETTINGS, type AppSettingsShape } from '@shared/constants'
 import type {
   AppInfoPayload,
   AuditQuery,
@@ -65,7 +65,7 @@ import type {
   SettingsRepository,
   StaffRepository
 } from '../db/repositories-core'
-import { AuditRepository } from '../db/repositories-clinical'
+import { AuditRepository, NotificationRepository } from '../db/repositories-clinical'
 import type {
   AttachmentRepository,
   PatientRepository,
@@ -103,6 +103,7 @@ export interface AdminServiceDeps {
   printerProfiles: PrinterProfileRepository
   counters: CounterRepository
   audit: AuditRepository
+  notifications: NotificationRepository
   patients: PatientRepository
   invoices: InvoiceRepository
   prescriptions: PrescriptionRepository
@@ -149,6 +150,41 @@ export class AdminService {
    * the service would try to log a successful restore on a closed database and the whole operation
    * would appear to have failed.
    */
+  /**
+   * Raises a notification. A notification is a courtesy, never part of the transaction it describes, so a
+   * failure to write one must not fail the backup, restore or check that is already running.
+   */
+  private notify(input: Parameters<NotificationRepository['create']>[0]): void {
+    try {
+      this.deps.notifications.create(input)
+    } catch {
+      // Deliberately ignored: the operation itself has already succeeded or failed on its own merits.
+    }
+  }
+
+  /** Same, for a connection that was just re-opened (a restore swaps the live database underneath us). */
+  private notifyOn(db: SqliteDatabase, input: Parameters<NotificationRepository['create']>[0]): void {
+    try {
+      db.prepare(
+        `INSERT INTO notifications (category, priority, title, body, entity_type, entity_id, action_type,
+                                     action_payload_json, dedupe_key, created_at)
+         VALUES (@category, @priority, @title, @body, @entityType, @entityId, @actionType, NULL, @dedupeKey, datetime('now'))
+         ON CONFLICT(dedupe_key) DO NOTHING`
+      ).run({
+        category: input.category,
+        priority: input.priority,
+        title: input.title,
+        body: input.body ?? null,
+        entityType: input.entityType ?? null,
+        entityId: input.entityId ?? null,
+        actionType: input.actionType ?? null,
+        dedupeKey: input.dedupeKey ?? null
+      })
+    } catch {
+      // A restored backup from an older schema may not even have the table; the restore still stands.
+    }
+  }
+
   private auditOn(
     db: SqliteDatabase,
     action: string,
@@ -520,6 +556,21 @@ export class AdminService {
       after: { ok: report.ok, checks: report.checks.length },
       severity: report.ok ? 'info' : 'critical'
     })
+    if (!report.ok) {
+      const failed = report.checks.filter((check) => !check.ok)
+      this.notify({
+        category: 'system',
+        priority: 'critical',
+        title: 'Database integrity check failed',
+        body: `${failed.length} of ${report.checks.length} checks reported a problem: ${failed
+          .map((check) => check.name)
+          .join(', ')}.`,
+        entityType: 'system',
+        actionType: 'open_settings',
+        // One notice a day is enough to keep the problem visible without burying the rest of the centre.
+        dedupeKey: `system-integrity-${report.ranAt.slice(0, 10)}`
+      })
+    }
     return report
   }
 
@@ -863,7 +914,19 @@ export class AdminService {
   private backupRoot(): string {
     const configured = this.deps.settings.get().backupFolder
     const folder = configured && configured.trim() !== '' ? configured : this.deps.layout.backupsDir
-    mkdirSync(folder, { recursive: true })
+    if (existsSync(folder) && !statSync(folder).isDirectory()) {
+      throw new AppError('INTERNAL', `The backup folder "${folder}" is a file, not a folder.`)
+    }
+    try {
+      mkdirSync(folder, { recursive: true })
+    } catch (error) {
+      // A missing drive, a permission problem or a path below a file: the operator needs to be told what is
+      // wrong instead of seeing a raw filesystem error.
+      throw new AppError(
+        'INTERNAL',
+        `The backup folder could not be created: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
     return folder
   }
 
@@ -897,12 +960,35 @@ export class AdminService {
     const stamp = nowSql().replace(/[: ]/g, '-')
     // The timestamp has second resolution, so two backups started in the same second must not share a
     // folder: the second one would silently overwrite the first.
+    let root: string
+    try {
+      root = this.backupRoot()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      // Record the attempt as well, so the backup register shows what was tried and why it did not happen.
+      this.recordBackupFailure(this.backupFolderPath(), trigger, message)
+      this.notify({
+        category: 'backup',
+        priority: 'critical',
+        title: 'Backup failed',
+        body: message,
+        entityType: 'backup',
+        dedupeKey: `backup-failed-${nowSql()}`
+      })
+      throw error
+    }
     let folderName = `DentivaPro_Backup_${stamp}`
-    for (let attempt = 2; existsSync(join(this.backupRoot(), folderName)); attempt += 1) {
+    for (let attempt = 2; existsSync(join(root, folderName)); attempt += 1) {
       folderName = `DentivaPro_Backup_${stamp}_${attempt}`
     }
-    const folderPath = join(this.backupRoot(), folderName)
-    mkdirSync(folderPath, { recursive: true })
+    const folderPath = join(root, folderName)
+    try {
+      mkdirSync(folderPath, { recursive: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.recordBackupFailure(folderPath, trigger, message)
+      throw new AppError('INTERNAL', `The backup could not be created: ${message}`)
+    }
 
     this.progress('backup', 'database', 'Copying the database…', 0, includeAttachments ? 3 : 2)
     const databaseDir = join(folderPath, 'Database')
@@ -1031,6 +1117,18 @@ export class AdminService {
       }
     )
     this.progress('backup', 'done', 'Backup complete.', 3, 3)
+    this.notify({
+      category: 'backup',
+      priority: 'info',
+      title: `${BACKUP_TRIGGER_LABELS[trigger]}: ${record.fileName}`,
+      body: `${(record.sizeBytes / 1024 / 1024).toFixed(1)} MB · integrity ${integrityCheck}${
+        includeAttachments ? ' · attachments included' : ''
+      }`,
+      entityType: 'backup',
+      entityId: record.id,
+      actionType: 'open_backup',
+      dedupeKey: `backup-${record.fileName}`
+    })
     this.pruneBackups(settings.autoBackupRetention, trigger)
     return record
   }
@@ -1051,6 +1149,14 @@ export class AdminService {
       entityType: 'backup',
       entityId: null,
       severity: 'critical'
+    })
+    this.notify({
+      category: 'backup',
+      priority: 'critical',
+      title: 'Backup failed',
+      body: `${message} (${trigger.replace('_', ' ')} backup in ${basename(folderPath)})`,
+      entityType: 'backup',
+      dedupeKey: `backup-failed-${basename(folderPath)}`
     })
   }
 
@@ -1253,6 +1359,34 @@ export class AdminService {
     )
   }
 
+  /**
+   * Reminds the clinic when the scheduled backup has not run for longer than its interval. Called by the
+   * same timer that refreshes the clinical notifications, and raised at most once a day.
+   */
+  refreshBackupNotifications(): void {
+    const settings = this.deps.settings.get()
+    if (!settings.autoBackupEnabled || settings.autoBackupIntervalDays <= 0) return
+    const newest = this.deps.db
+      .prepare("SELECT file_name, created_at FROM backups WHERE status = 'success' ORDER BY id DESC LIMIT 1")
+      .get() as { file_name: string; created_at: string } | undefined
+    if (newest) {
+      const createdAt = Date.parse(newest.created_at.replace(' ', 'T'))
+      const dueAt = createdAt + settings.autoBackupIntervalDays * 86_400_000
+      if (Number.isFinite(createdAt) && dueAt > Date.now()) return
+    }
+    this.notify({
+      category: 'backup',
+      priority: 'warning',
+      title: 'Automatic backup is overdue',
+      body: newest
+        ? `The newest backup (${newest.file_name}) is older than the ${settings.autoBackupIntervalDays}-day schedule.`
+        : `No backup has been created yet, and automatic backups are set to every ${settings.autoBackupIntervalDays} day(s).`,
+      entityType: 'backup',
+      actionType: 'open_backup',
+      dedupeKey: `backup-overdue-${todayIso()}`
+    })
+  }
+
   /** Keep only the newest `retention` automatic backups. Manual backups are never pruned. */
   pruneBackups(retention: number, trigger: BackupRecord['trigger'] = 'auto'): void {
     const keep = Math.max(1, retention)
@@ -1446,6 +1580,18 @@ export class AdminService {
       entityId: preRestoreBackup.id,
       after: { folder: request.folderPath, verification: verificationMessage },
       severity: 'critical'
+    })
+    // The live connection was re-opened a few lines above, so this notice has to be written through `live`
+    // rather than through the repository the container was built with.
+    this.notifyOn(live, {
+      category: 'restore',
+      priority: 'warning',
+      title: 'Clinic data restored',
+      body: `Restored from ${basename(request.folderPath)}. The previous state was kept as ${preRestoreBackup.fileName}.`,
+      entityType: 'backup',
+      entityId: preRestoreBackup.id,
+      actionType: 'open_backup',
+      dedupeKey: `restore-${basename(request.folderPath)}-${nowSql()}`
     })
     this.progress('restore', 'done', 'Restore complete. Please sign in again.', 5, 5)
     // A restored database may contain different users, so the current session must end.
