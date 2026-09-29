@@ -341,7 +341,8 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
       amountPoisha: 200_000,
       methodCode: 'cash',
       referenceNo: null,
-      receivedAt: new Date().toISOString().slice(0, 10)
+      // The payment carries a date and a time (the schema records when the money was received).
+      receivedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
     })
     expect(payment.receiptNo).toMatch(/^RCP-/)
     expect(payment.amountPoisha).toBe(200_000)
