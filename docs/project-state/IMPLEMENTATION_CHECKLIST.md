@@ -64,7 +64,7 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 4.4 | Payment dashboard defaulting to today | **Done** | `reports.test.ts` (defaults to today, per-method totals, voided payments excluded and the invoice balance reopened) |
 | 4.5 | Accounting: invoiced revenue vs received cash, expenses, cash flow | **Done** | `billing.test.ts` |
 | 4.6 | Financial reports from real transactions | **Done** | `reports.test.ts` exercises all ten catalogue reports against real ledger rows (invoiced revenue separated from received cash, empty window still well-formed, permission refusal) and exports one to CSV through the real channel (`security-hardening.test.ts`); the generic CSV/JSON export path is asserted in `admin.test.ts` |
-| 4.7 | Inventory: batches, expiry, low stock, immutable ledger | **Partial** | `billing.test.ts` (stock, issue, low stock, over-issue); expiry notification path missing |
+| 4.7 | Inventory: batches, expiry, low stock, immutable ledger | **Done** | `billing.test.ts` (stock, issue, low stock, over-issue, immutable ledger); the sweep raises both the low-stock and the expiring-batch notices with dedupe (`operations.test.ts`) |
 
 ## 5. Printing and PDF
 

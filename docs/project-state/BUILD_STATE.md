@@ -22,15 +22,15 @@ last_updated: 2026-09-30
 | Database schema + migrations + repositories | **Complete** (migrations 0001–0005, checksum/append-only/fixture tests in `security-hardening.test.ts`) |
 | Services + IPC router (business-layer authorization) | **Complete** (~140 channels, every service checks permissions) |
 | Renderer design system + shell + feature screens | **Complete** (prescriptions screen runs on the real channels; verified through the router in the preview harness) |
-| Unit tests | **137 passing** (9 files) — money 16, date 15, dental/ids/csv 17, printing 21, security 16, validation 20, session/activation 14, window state 8, renderer components 10 |
-| Integration tests | **105 passing** (8 files) — setup/auth 10, clinical 10, billing 13, admin 18, backup/audit 15, security hardening 16 (router boundary, migrations, aborted transactions, activation and audit tamper, global search), reports 10, operations 14 (destructive safeguards, reset, patient filters, notifications, setup validation, CSV import) |
+| Unit tests | **138 passing** (9 files) — money 16, date 15, dental/ids/csv 17, printing 21, security 17, validation 20, session/activation 14, window state 8, renderer components 10 |
+| Integration tests | **110 passing** (8 files) — setup/auth 10, clinical 10, billing 13, admin 18, backup/audit 15, security hardening 16 (router boundary, migrations, aborted transactions, activation and audit tamper, global search), reports 10, operations 18 (destructive safeguards, reset, patient filters, every notification category, setup validation, CSV import) |
 | Pre-release audits (master §113) | **Running** — `npm run audit:prerelease` executes 14 audits; the Windows-only two report a reasoned skip |
 | Requirements traceability matrix | **Complete** — `docs/testing/TRACEABILITY_MATRIX.md`, regenerated and freshness-checked in CI |
 | Release readiness document | **Written** — `docs/release/RELEASE_READINESS.md` (verdict: not releasable until the Windows evidence exists) |
 | End-to-end (Electron) suites | **Written, first run pending on windows-latest** |
 | Performance measurement (NFR-003) | **Measured** — `docs/testing/PERFORMANCE_MEASUREMENTS.md` |
 | Dependency/licence audit + third-party notices | **Complete** (`npm run audit:deps`, `npm run licenses`) |
-| GitHub Actions CI + release pipeline | **Running** — quality, maintenance and build jobs pass on GitHub; the integration and end-to-end jobs need the `DENTIVA_ACTIVATION_CODE` repository secret (not yet configured, see below) |
+| GitHub Actions CI + release pipeline | **Running** — quality, maintenance and integration jobs are green on GitHub since the `DENTIVA_ACTIVATION_CODE` secret was configured (the integration job now runs all 110 integration tests for real). The Windows end-to-end job executes the suite and is being diagnosed through annotations |
 | Windows installer build, clean-machine test | **Pending** (windows-latest) |
 | Release (GitHub Release or `dist/`) | **Pending** |
 
@@ -66,7 +66,7 @@ known_issues:
   - Empty folders kept out of git (for example an empty attachments directory) must be created by the code at runtime; do not re-add committed placeholder files.
 pending_fixes: []
 last_successful_build: green (electron-vite build, out/renderer ~1.45 MB js + 49 kB css; GitHub Actions quality job green)
-last_successful_test: 242 passing locally (137 unit + 105 integration) with DENTIVA_ACTIVATION_CODE set; without it the activation-dependent integration suites report as skipped by design (138 passed / 104 skipped). GitHub CI: lint/types/build/unit + maintenance jobs green, integration + e2e waiting for the repository secret.
+last_successful_test: 248 passing locally (138 unit + 110 integration) with DENTIVA_ACTIVATION_CODE set; without it the activation-dependent integration suites report as skipped by design (143 passed / 105 skipped). GitHub CI: lint/types/build/unit, maintenance and integration jobs green; the Windows e2e job runs the Electron suite and its failures are published as annotations.
 ```
 
 ## Corrections found by auditing the repository (2026-09-30, keep them fixed)
@@ -116,7 +116,18 @@ last_successful_test: 242 passing locally (137 unit + 105 integration) with DENT
    mapping with aliases, per-row validation through the registration schema, duplicate detection inside the
    file and against the register, a dry run that writes nothing, an all-or-nothing transaction, one audit
    entry, and a confirmation dialog that lists every problem with its line number.
-10. **The traceability freshness check was date-dependent.** The generator stamped the file with the current
+10. **Five notification categories could never appear.** The centre declared eight categories, but only
+   appointment, inventory and billing were ever written: nothing raised backup, restore, security, system or
+   queue notices, although REQ-NOTIF-001 asks for backup status, restore warnings and system/security
+   notices, and the queue is where a silent delay costs a patient. All five now fire from real events
+   (queue waiting past `queueWaitingReminderMinutes`, every backup and a failed one, an overdue schedule, a
+   finished restore, failed sign-ins and lockouts, a failed integrity check), each with deduplication, and
+   `operations.test.ts` covers them.
+11. **A broken backup folder leaked a filesystem error.** `backupRoot()` created the folder outside any
+   error handling, so a backup folder that was a file (or below one) surfaced as a raw `ENOTDIR`, and no
+   failed attempt was recorded. Both paths now explain themselves, record the failed attempt in the backup
+   register and raise a critical notice.
+12. **The traceability freshness check was date-dependent.** The generator stamped the file with the current
    date and CI compared it byte for byte, so the check would have failed on the next day even with an
    unchanged repository. The timestamp is gone; `npm run docs:traceability -- --check` is now stable.
 

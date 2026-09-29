@@ -15,7 +15,7 @@ Reading order: *Verdict* → *Gates* → *Pending evidence* → *Known deviation
 | Question | Answer |
 |---|---|
 | Is the source complete for the agreed scope? | **Yes** — every feature in `docs/requirements/` is implemented, reachable from the interface and covered by the traceability matrix. |
-| Are the automated gates green? | **Locally yes** (lint, typecheck, build, unit, integration, maintenance tools, pre-release audits). On GitHub the quality and maintenance jobs are green; the integration and end-to-end jobs are **blocked by a missing repository secret**. |
+| Are the automated gates green? | **Locally yes** (lint, typecheck, build, unit, integration, maintenance tools, pre-release audits), and on GitHub the quality, maintenance and integration jobs are green — the integration job runs the whole 110-test suite with the activation secret instead of skipping it. The Windows end-to-end job now executes the Electron suite; it is failing and its output is published as a job annotation while the failures are worked through. |
 | Has a Windows installer been built and installed on a clean machine? | **No — this has never been executed.** The development sandbox has no Windows host, no Wine and no Electron binary, so packaging, install, print, PDF, DPI and Electron end-to-end evidence can only be produced by the `windows-latest` jobs of `.github/workflows/ci.yml` / `release.yml`. |
 | Is there a releasable artefact? | **Not yet.** Until the Windows jobs run, `release/` is empty and `scripts/verify-release-artifact.mjs` fails by design. |
 | Release decision | **Not releasable yet.** The remaining work is *evidence*, not code: run the Windows jobs, then re-check the tables below. |
@@ -27,8 +27,8 @@ Reading order: *Verdict* → *Gates* → *Pending evidence* → *Known deviation
 | Lint | `npm run lint` (eslint, `--max-warnings 0`) | local + CI quality job | **Pass** |
 | Types | `npm run typecheck` (`tsconfig.node.json` + `tsconfig.web.json`) | local + CI quality job | **Pass** |
 | Build | `npm run build` (electron-vite: main, preload, renderer) | local + CI quality job | **Pass** (renderer ≈ 1.45 MB JS + 49 kB CSS) |
-| Unit tests | `npx vitest run tests/unit` | local | **Pass** — 9 files / 137 tests (including the component suite) |
-| Integration tests | `DENTIVA_ACTIVATION_CODE=… npx vitest run tests/integration` | local | **Pass** — 8 files / 105 tests |
+| Unit tests | `npx vitest run tests/unit` | local + CI | **Pass** — 9 files / 138 tests (including the component suite) |
+| Integration tests | `DENTIVA_ACTIVATION_CODE=… npx vitest run tests/integration` | local + CI | **Pass** — 8 files / 110 tests; the GitHub Actions `integration` job runs the same command with the repository secret and is green |
 | Without the activation secret | `npx vitest run tests/integration` | local + CI | **Pass by skip** — activation-dependent suites report as skipped, never as passed |
 | Maintenance tools | `npm run audit:deps`, `npm run licenses`, `node scripts/verify-backup.mjs`, stress seeder (reduced scale) | local + CI maintenance job | **Pass** |
 | Pre-release audits (§113) | `npm run audit:prerelease` | local | **Pass** — 14 audits, all 12 host-independent ones pass (including a real backup produced and verified on the spot); the two Windows-only audits report a reasoned skip. The CI maintenance job runs the same command and uploads `pre-release-audit.md` as an artifact |
@@ -46,7 +46,7 @@ Reading order: *Verdict* → *Gates* → *Pending evidence* → *Known deviation
 | Suite | Files | Tests | Notes |
 |---|---|---|---|
 | Unit | 8 | 126 | money, date, ids/dental/csv, printing, security/RBAC, validation, session/activation, window state |
-| Integration | 8 | 105 | setup/auth, clinical, billing, admin, backup/audit, security hardening (router boundary, migrations, transactions, activation/audit tamper, global search), reports (payment dashboard, all ten reports, CSV export), operations (destructive safeguards, reset, patient filters, notifications, setup validation, CSV import) |
+| Integration | 8 | 110 | setup/auth, clinical, billing, admin, backup/audit, security hardening (router boundary, migrations, transactions, activation/audit tamper, global search), reports (payment dashboard, all ten reports, CSV export), operations (destructive safeguards, reset, patient filters, every notification category, setup validation, CSV import) |
 | End-to-end (Playwright + Electron) | 3 | written, not executed | setup wizard, critical 101-step flow — **requires windows-latest** |
 
 `docs/testing/ACCEPTANCE_TEST_CHECKLIST.md` carries the per-requirement detail: **53 Pass**, **4 pending
