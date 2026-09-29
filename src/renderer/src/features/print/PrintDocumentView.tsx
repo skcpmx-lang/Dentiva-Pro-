@@ -6,6 +6,7 @@
  * from the document itself.
  */
 
+import type { CSSProperties, ReactElement } from 'react'
 import type {
   InvoiceDocument,
   PrescriptionDocument,
@@ -435,9 +436,9 @@ export function PrintDocumentView({
 }: {
   document: PrintDocument
   onClose?: () => void
-}): React.ReactElement {
+}): ReactElement {
   const paper = document.paper
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     width: `${paper.widthMm}mm`,
     minHeight: paper.heightMm ? `${paper.heightMm}mm` : undefined,
     paddingTop: `${paper.margins.top}mm`,

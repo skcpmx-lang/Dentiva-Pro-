@@ -172,8 +172,6 @@ export interface ChannelHandler<TPayload = unknown, TResult = unknown> {
   permission: PermissionCode | null
   /** Payload validation; `null` means the channel takes no payload at all. */
   schema: ZodType | null
-  /** Write an audit entry for a successful call (used for state-changing operations). */
-  audit?: string
   /** Refuse the call unless the session is usable. Defaults to true. */
   requiresSession?: boolean
   handler: (ctx: HandlerContext, payload: TPayload) => TResult | Promise<TResult>
@@ -264,7 +262,6 @@ export function createRegistry(): Registry {
     'auth.changePassword': {
       permission: null,
       schema: changePasswordSchema,
-      audit: 'auth.change_password',
       handler: (ctx, payload) => {
         ctx.services.auth.changeOwnPassword(payload.currentPassword, payload.newPassword)
         return { ok: true as const }
@@ -335,19 +332,16 @@ export function createRegistry(): Registry {
     'patients.create': {
       permission: 'patients.create',
       schema: patientInputSchema,
-      audit: 'patient.create',
       handler: (ctx, payload) => ctx.services.clinical.createPatient(payload)
     },
     'patients.update': {
       permission: 'patients.edit',
       schema: updateWithInputSchema(patientInputSchema),
-      audit: 'patient.update',
       handler: (ctx, payload) => ctx.services.clinical.updatePatient(payload.id, payload.input)
     },
     'patients.archive': {
       permission: 'patients.delete',
       schema: patientArchiveSchema,
-      audit: 'patient.archive',
       handler: (ctx, payload) => {
         ctx.services.clinical.archivePatient(payload.id)
         return { ok: true as const }
@@ -356,7 +350,6 @@ export function createRegistry(): Registry {
     'patients.restore': {
       permission: 'patients.delete',
       schema: patientRestoreSchema,
-      audit: 'patient.restore',
       handler: (ctx, payload) => {
         ctx.services.clinical.restorePatient(payload.id)
         return { ok: true as const }
@@ -370,7 +363,6 @@ export function createRegistry(): Registry {
     'patients.addNote': {
       permission: 'patients.edit',
       schema: patientNoteSchema,
-      audit: 'patient.note',
       handler: (ctx, payload) => {
         ctx.services.clinical.addPatientNote(payload.patientId, payload.note)
         return { ok: true as const }
@@ -404,25 +396,21 @@ export function createRegistry(): Registry {
     'visits.create': {
       permission: 'visits.create',
       schema: visitInputSchema,
-      audit: 'visit.create',
       handler: (ctx, payload) => ctx.services.clinical.createVisit(payload)
     },
     'visits.update': {
       permission: 'visits.edit',
       schema: updateWithInputSchema(visitInputSchema),
-      audit: 'visit.update',
       handler: (ctx, payload) => ctx.services.clinical.updateVisit(payload.id, payload.input)
     },
     'visits.finalize': {
       permission: 'visits.finalize',
       schema: idPayloadSchema,
-      audit: 'visit.finalize',
       handler: (ctx, payload) => ctx.services.clinical.finalizeVisit(payload.id)
     },
     'visits.delete': {
       permission: 'visits.delete',
       schema: idWithReasonSchema,
-      audit: 'visit.delete',
       handler: (ctx, payload) => {
         ctx.services.clinical.deleteVisit(payload.id)
         return { ok: true as const }
@@ -440,7 +428,6 @@ export function createRegistry(): Registry {
     'chart.save': {
       permission: 'chart.edit',
       schema: chartSaveSchema,
-      audit: 'chart.save',
       handler: (ctx, payload) =>
         ctx.services.clinical.saveChart(payload.patientId, payload.entries, payload.visitId ?? null)
     },
@@ -460,13 +447,11 @@ export function createRegistry(): Registry {
     'clinical.options.save': {
       permission: 'treatments.manage',
       schema: clinicalOptionSaveSchema,
-      audit: 'clinical_option.save',
       handler: (ctx, payload) => ctx.services.clinical.saveClinicalOption(payload)
     },
     'clinical.options.deactivate': {
       permission: 'treatments.manage',
       schema: idPayloadSchema,
-      audit: 'clinical_option.deactivate',
       handler: (ctx, payload) => {
         ctx.services.clinical.deactivateClinicalOption(payload.id)
         return { ok: true as const }
@@ -489,19 +474,16 @@ export function createRegistry(): Registry {
     'prescriptions.create': {
       permission: 'prescriptions.create',
       schema: prescriptionInputSchema,
-      audit: 'prescription.create',
       handler: (ctx, payload) => ctx.services.clinical.createPrescription(payload)
     },
     'prescriptions.update': {
       permission: 'prescriptions.edit',
       schema: updateWithInputSchema(prescriptionInputSchema),
-      audit: 'prescription.update',
       handler: (ctx, payload) => ctx.services.clinical.updatePrescription(payload.id, payload.input)
     },
     'prescriptions.void': {
       permission: 'prescriptions.delete',
       schema: prescriptionVoidSchema,
-      audit: 'prescription.void',
       handler: (ctx, payload) => {
         ctx.services.clinical.voidPrescription(payload.id, payload.reason)
         return { ok: true as const }
@@ -522,13 +504,11 @@ export function createRegistry(): Registry {
     'referrals.create': {
       permission: 'visits.create',
       schema: referralInputSchema,
-      audit: 'referral.create',
       handler: (ctx, payload) => ctx.services.clinical.createReferral(payload)
     },
     'referrals.updateStatus': {
       permission: 'visits.edit',
       schema: referralStatusSchema,
-      audit: 'referral.status',
       handler: (ctx, payload) => {
         ctx.services.clinical.updateReferralStatus(payload.id, payload.status, payload.outcome ?? null)
         return { ok: true as const }
@@ -551,26 +531,22 @@ export function createRegistry(): Registry {
     'appointments.create': {
       permission: 'appointments.create',
       schema: appointmentInputSchema,
-      audit: 'appointment.create',
       handler: (ctx, payload) => ctx.services.clinical.createAppointment(payload)
     },
     'appointments.update': {
       permission: 'appointments.edit',
       schema: updateWithInputSchema(appointmentInputSchema),
-      audit: 'appointment.update',
       handler: (ctx, payload) => ctx.services.clinical.updateAppointment(payload.id, payload.input)
     },
     'appointments.setStatus': {
       permission: 'appointments.edit',
       schema: appointmentStatusSchema,
-      audit: 'appointment.status',
       handler: (ctx, payload) =>
         ctx.services.clinical.setAppointmentStatus(payload.id, payload.status, payload.reason ?? null)
     },
     'appointments.reschedule': {
       permission: 'appointments.edit',
       schema: rescheduleSchema,
-      audit: 'appointment.reschedule',
       handler: (ctx, payload) =>
         ctx.services.clinical.rescheduleAppointment(payload.id, {
           appointmentDate: payload.appointmentDate,
@@ -581,7 +557,6 @@ export function createRegistry(): Registry {
     'appointments.delete': {
       permission: 'appointments.delete',
       schema: idWithReasonSchema,
-      audit: 'appointment.delete',
       handler: (ctx, payload) => {
         ctx.services.clinical.deleteAppointment(payload.id)
         return { ok: true as const }
@@ -595,13 +570,11 @@ export function createRegistry(): Registry {
     'queue.add': {
       permission: 'queue.manage',
       schema: queueAddSchema,
-      audit: 'queue.add',
       handler: (ctx, payload) => ctx.services.clinical.addToQueue(payload)
     },
     'queue.update': {
       permission: 'queue.manage',
       schema: queueUpdateSchema,
-      audit: 'queue.update',
       handler: (ctx, payload) =>
         ctx.services.clinical.updateQueueEntry(payload.id, {
           status: payload.status,
@@ -613,7 +586,6 @@ export function createRegistry(): Registry {
     'queue.reorder': {
       permission: 'queue.reorder',
       schema: queueReorderSchema,
-      audit: 'queue.reorder',
       handler: (ctx, payload) => ctx.services.clinical.reorderQueue(payload.queueDate, payload.orderedIds)
     },
 
@@ -628,13 +600,11 @@ export function createRegistry(): Registry {
     'treatments.save': {
       permission: 'treatments.manage',
       schema: treatmentSaveSchema,
-      audit: 'treatment.save',
       handler: (ctx, payload) => ctx.services.clinical.saveTreatment(payload)
     },
     'treatments.deactivate': {
       permission: 'treatments.manage',
       schema: treatmentDeactivateSchema,
-      audit: 'treatment.deactivate',
       handler: (ctx, payload) => {
         ctx.services.clinical.deactivateTreatment(payload.id)
         return { ok: true as const }
@@ -657,19 +627,16 @@ export function createRegistry(): Registry {
     'invoices.create': {
       permission: 'invoices.create',
       schema: invoiceInputSchema,
-      audit: 'invoice.create',
       handler: (ctx, payload) => ctx.services.billing.createInvoice(payload)
     },
     'invoices.update': {
       permission: 'invoices.edit',
       schema: updateWithInputSchema(invoiceInputSchema),
-      audit: 'invoice.update',
       handler: (ctx, payload) => ctx.services.billing.updateInvoice(payload.id, payload.input)
     },
     'invoices.void': {
       permission: 'invoices.void',
       schema: idWithReasonSchema,
-      audit: 'invoice.void',
       handler: (ctx, payload) => ctx.services.billing.voidInvoice(payload.id, payload.reason)
     },
     'invoices.outstanding': {
@@ -703,13 +670,11 @@ export function createRegistry(): Registry {
     'payments.create': {
       permission: 'payments.create',
       schema: paymentInputSchema,
-      audit: 'payment.create',
       handler: (ctx, payload) => ctx.services.billing.createPayment(payload)
     },
     'payments.void': {
       permission: 'payments.void',
       schema: idWithReasonSchema,
-      audit: 'payment.void',
       handler: (ctx, payload) => ctx.services.billing.voidPayment(payload.id, payload.reason)
     },
     'payments.dashboard': {
@@ -750,19 +715,16 @@ export function createRegistry(): Registry {
     'accounting.expenses.create': {
       permission: 'accounting.manage',
       schema: expenseInputSchema,
-      audit: 'expense.create',
       handler: (ctx, payload) => ctx.services.billing.createExpense(payload)
     },
     'accounting.expenses.update': {
       permission: 'accounting.manage',
       schema: updateWithInputSchema(expenseInputSchema),
-      audit: 'expense.update',
       handler: (ctx, payload) => ctx.services.billing.updateExpense(payload.id, payload.input)
     },
     'accounting.expenses.void': {
       permission: 'accounting.manage',
       schema: idWithReasonSchema,
-      audit: 'expense.void',
       handler: (ctx, payload) => ctx.services.billing.voidExpense(payload.id, payload.reason)
     },
     'accounting.categories': {
@@ -773,7 +735,6 @@ export function createRegistry(): Registry {
     'accounting.categories.create': {
       permission: 'accounting.manage',
       schema: categoryInputSchema,
-      audit: 'expense_category.save',
       handler: (ctx, payload) => ctx.services.billing.saveExpenseCategory(payload)
     },
 
@@ -793,19 +754,16 @@ export function createRegistry(): Registry {
     'inventory.save': {
       permission: 'inventory.manage',
       schema: inventoryItemInputSchema,
-      audit: 'inventory.save',
       handler: (ctx, payload) => ctx.services.billing.saveInventoryItem(payload)
     },
     'inventory.stockIn': {
       permission: 'inventory.manage',
       schema: stockInSchema,
-      audit: 'inventory.stock_in',
       handler: (ctx, payload) => ctx.services.billing.stockIn(payload).item
     },
     'inventory.issue': {
       permission: 'inventory.adjust',
       schema: stockIssueSchema,
-      audit: 'inventory.issue',
       handler: (ctx, payload) => ctx.services.billing.issueStock(payload)
     },
     'inventory.batches': {
@@ -826,7 +784,6 @@ export function createRegistry(): Registry {
     'inventory.suppliers.save': {
       permission: 'inventory.manage',
       schema: supplierSaveSchema,
-      audit: 'supplier.save',
       handler: (ctx, payload) => {
         const { id, ...input } = payload
         return ctx.services.billing.createSupplier(input, id)
@@ -844,7 +801,6 @@ export function createRegistry(): Registry {
     'attachments.add': {
       permission: 'patients.attachments.manage',
       schema: attachmentAddSchema,
-      audit: 'attachment.add',
       handler: (ctx, payload) => ctx.services.billing.attachFile(payload)
     },
     'attachments.open': {
@@ -859,13 +815,11 @@ export function createRegistry(): Registry {
     'attachments.rename': {
       permission: 'patients.attachments.manage',
       schema: attachmentRenameSchema,
-      audit: 'attachment.rename',
       handler: (ctx, payload) => ctx.services.billing.renameAttachment(payload.id, payload.title)
     },
     'attachments.delete': {
       permission: 'patients.attachments.manage',
       schema: attachmentDeleteSchema,
-      audit: 'attachment.delete',
       handler: (ctx, payload) => {
         ctx.services.billing.deleteAttachment(payload.id)
         return { ok: true as const }
@@ -917,7 +871,6 @@ export function createRegistry(): Registry {
     'notifications.dismiss': {
       permission: 'notifications.manage',
       schema: idPayloadSchema,
-      audit: 'notification.dismiss',
       handler: (ctx, payload) => {
         ctx.services.clinical.dismissNotification(payload.id)
         return { ok: true as const }
@@ -956,7 +909,6 @@ export function createRegistry(): Registry {
     'system.destructive': {
       permission: 'data.destructive',
       schema: destructiveRequestSchema,
-      audit: 'system.destructive',
       handler: async (ctx, payload) => {
         const result = await ctx.services.admin.runDestructive(payload)
         return { affected: result.affected, preBackup: result.preBackup }
@@ -992,25 +944,21 @@ export function createRegistry(): Registry {
     'settings.update': {
       permission: 'settings.manage',
       schema: settingsPatchSchema,
-      audit: 'settings.update',
       handler: (ctx, payload) => ctx.services.admin.updateSettings(payload.patch as never)
     },
     'clinic.update': {
       permission: 'settings.manage',
       schema: clinicInputSchema,
-      audit: 'clinic.update',
       handler: (ctx, payload) => ctx.services.admin.updateClinic(payload)
     },
     'clinic.logo.save': {
       permission: 'settings.manage',
       schema: clinicLogoSchema,
-      audit: 'clinic.logo',
       handler: (ctx, payload) => ctx.services.admin.saveClinicLogo(payload.sourcePath)
     },
     'clinic.logo.clear': {
       permission: 'settings.manage',
       schema: emptySchema,
-      audit: 'clinic.logo.clear',
       handler: (ctx) => ctx.services.admin.clearClinicLogo()
     },
     'users.list': {
@@ -1021,7 +969,6 @@ export function createRegistry(): Registry {
     'users.create': {
       permission: 'users.manage',
       schema: userSaveSchema,
-      audit: 'user.create',
       handler: (ctx, payload) => {
         const password = requireValue(payload.password, 'password', 'Enter a password for the new user.')
         return ctx.services.auth.createUser(payload, password)
@@ -1030,7 +977,6 @@ export function createRegistry(): Registry {
     'users.update': {
       permission: 'users.manage',
       schema: userSaveSchema,
-      audit: 'user.update',
       handler: (ctx, payload) => {
         const id = requireValue(payload.id, 'id', 'Choose the user to update.')
         return ctx.services.auth.updateUser(id, payload, payload.password)
@@ -1044,7 +990,6 @@ export function createRegistry(): Registry {
     'roles.create': {
       permission: 'roles.manage',
       schema: roleSaveSchema,
-      audit: 'role.create',
       handler: (ctx, payload) =>
         ctx.services.auth.createRole({
           code: payload.name
@@ -1060,7 +1005,6 @@ export function createRegistry(): Registry {
     'roles.update': {
       permission: 'roles.manage',
       schema: roleSaveSchema,
-      audit: 'role.update',
       handler: (ctx, payload) => {
         const id = requireValue(payload.id, 'id', 'Choose the role to update.')
         return ctx.services.auth.updateRole(id, {
@@ -1073,7 +1017,6 @@ export function createRegistry(): Registry {
     'roles.delete': {
       permission: 'roles.manage',
       schema: unorderedIdSchema,
-      audit: 'role.delete',
       handler: (ctx, payload) => {
         ctx.services.auth.deleteRole(payload.id)
         return { ok: true as const }
@@ -1098,7 +1041,6 @@ export function createRegistry(): Registry {
     'dentists.save': {
       permission: 'staff.manage',
       schema: dentistInputSchema,
-      audit: 'dentist.save',
       handler: (ctx, payload) => {
         const { id, ...input } = payload
         return ctx.services.admin.saveDentist(input, id)
@@ -1107,13 +1049,11 @@ export function createRegistry(): Registry {
     'dentists.setActive': {
       permission: 'staff.manage',
       schema: dentistActiveSchema,
-      audit: 'dentist.status',
       handler: (ctx, payload) => ctx.services.admin.setDentistActive(payload.id, payload.isActive)
     },
     'dentists.signature': {
       permission: 'staff.manage',
       schema: signatureSchema,
-      audit: 'dentist.signature',
       handler: (ctx, payload) => ctx.services.admin.saveDentistSignature(payload.id, payload.sourcePath)
     },
     'staff.list': {
@@ -1124,7 +1064,6 @@ export function createRegistry(): Registry {
     'staff.save': {
       permission: 'staff.manage',
       schema: staffInputSchema,
-      audit: 'staff.save',
       handler: (ctx, payload) => {
         const { id, ...input } = payload
         return ctx.services.admin.saveStaff(input, id)
@@ -1133,7 +1072,6 @@ export function createRegistry(): Registry {
     'staff.remove': {
       permission: 'staff.manage',
       schema: unorderedIdSchema,
-      audit: 'staff.remove',
       handler: (ctx, payload) => {
         ctx.services.admin.removeStaff(payload.id)
         return { ok: true as const }
@@ -1151,7 +1089,6 @@ export function createRegistry(): Registry {
     'backups.create': {
       permission: 'backup.create',
       schema: backupCreateSchema,
-      audit: 'backup.create',
       handler: async (ctx, payload) => {
         const record = await ctx.services.admin.createBackup('manual', {
           includeAttachments: payload?.includeAttachments ?? true,
@@ -1171,7 +1108,6 @@ export function createRegistry(): Registry {
     'backups.delete': {
       permission: 'backup.create',
       schema: backupDeleteSchema,
-      audit: 'backup.delete',
       handler: (ctx, payload) => {
         ctx.services.admin.deleteBackup(payload.id, payload.deleteFiles ?? false)
         return { ok: true as const }
@@ -1180,7 +1116,6 @@ export function createRegistry(): Registry {
     'backups.restore': {
       permission: 'backup.restore',
       schema: restoreRequestSchema,
-      audit: 'backup.restore',
       handler: async (ctx, payload) => {
         const result = await ctx.services.admin.restoreBackup(payload)
         ctx.host.rebuildContainer()
@@ -1205,14 +1140,12 @@ export function createRegistry(): Registry {
     'printers.save': {
       permission: 'printers.manage',
       schema: printerSaveSchema,
-      audit: 'printer.save',
       handler: (ctx, payload) =>
         ctx.services.admin.savePrinterProfile({ ...(payload as PrinterProfile), id: payload.id ?? 0 })
     },
     'printers.delete': {
       permission: 'printers.manage',
       schema: printerDeleteSchema,
-      audit: 'printer.delete',
       handler: (ctx, payload) => {
         ctx.services.admin.deletePrinterProfile(payload.id)
         return { ok: true as const }
@@ -1231,7 +1164,6 @@ export function createRegistry(): Registry {
     'print.job': {
       permission: null,
       schema: printJobSchema,
-      audit: 'print.job',
       handler: (ctx, payload) => ctx.host.print(payload)
     },
     'print.ready': {
@@ -1257,7 +1189,6 @@ export function createRegistry(): Registry {
     'export.data': {
       permission: 'data.export',
       schema: exportDataSchema,
-      audit: 'data.export',
       handler: (ctx, payload) => ctx.services.billing.exportData(payload as never)
     },
     'export.chooseFolder': {
@@ -1273,7 +1204,6 @@ export function createRegistry(): Registry {
     'diagnostics.exportLogs': {
       permission: 'settings.view',
       schema: saveDialogSchema,
-      audit: 'diagnostics.export_logs',
       handler: (ctx, payload) => ctx.host.exportLogs(payload)
     },
     'diagnostics.startWorker': {

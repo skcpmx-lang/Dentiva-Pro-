@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CalendarPlus, CheckCircle2, Clock, Pencil, RefreshCw, UserX, XCircle } from 'lucide-react'
 import type { AppointmentInput, AppointmentSummary, Dentist } from '@shared/types'
-import { invoke, errorMessage } from '../../lib/api'
+import { invoke } from '../../lib/api'
 import { useApp } from '../../app/state'
 import {
   Badge,
@@ -547,5 +547,3 @@ export function AppointmentsPage() {
     </>
   )
 }
-
-void errorMessage
