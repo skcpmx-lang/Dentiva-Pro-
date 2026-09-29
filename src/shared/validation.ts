@@ -9,12 +9,14 @@ import { z } from 'zod'
 import {
   APPOINTMENT_STATUSES,
   BLOOD_GROUPS,
+  EXPORT_ENTITIES,
   GENDERS,
   INVENTORY_TRANSACTION_TYPES,
   PASSWORD_POLICY,
   PRESCRIPTION_WRITE_STATUSES,
   QUEUE_PRIORITIES,
   REFERRAL_STATUSES,
+  REPORT_KEYS,
   STAFF_STATUSES,
   TOOTH_SURFACES
 } from './constants'
@@ -639,18 +641,7 @@ export const destructiveRequestSchema = z.object({
 })
 
 export const exportRequestSchema = z.object({
-  entity: z.enum([
-    'patients',
-    'invoices',
-    'payments',
-    'expenses',
-    'inventory',
-    'appointments',
-    'visits',
-    'prescriptions',
-    'staff',
-    'audit'
-  ]),
+  entity: z.enum(EXPORT_ENTITIES),
   format: z.enum(['csv', 'json']),
   from: isoDateSchema.nullable().optional(),
   to: isoDateSchema.nullable().optional(),
@@ -936,9 +927,16 @@ export const saveDialogSchema = z.object({
     .optional()
 })
 export const reportDataSchema = z.object({
-  report: z.string().trim().min(2).max(60),
+  // Only catalogue reports exist: a typo is refused with a field error instead of rendering an empty page.
+  report: z.enum(REPORT_KEYS),
   from: isoDateSchema,
   to: isoDateSchema
+})
+export const reportExportSchema = z.object({
+  report: z.enum(REPORT_KEYS),
+  from: isoDateSchema,
+  to: isoDateSchema,
+  targetFolder: z.string().trim().min(1, 'Choose a folder to export into.').max(1000)
 })
 export const reportPrintSchema = z.object({
   title: z.string().trim().min(1).max(200),

@@ -26,44 +26,9 @@ import { usePagination, useQuery } from '../../lib/hooks'
 import { formatDate, money } from '../../lib/format'
 import { addDaysIso, todayIso } from '@shared/date'
 import { PAPER_SIZE_KEYS } from '@shared/printing/paper'
+import { REPORT_CATALOGUE } from '@shared/constants'
 
 type Preset = 'today' | 'last7' | 'last30' | 'thisMonth' | 'thisYear' | 'custom'
-
-const REPORTS: { key: string; label: string; description: string }[] = [
-  {
-    key: 'daily_income',
-    label: 'Daily income',
-    description: 'Invoiced, received and net figures for each day'
-  },
-  { key: 'expense_summary', label: 'Expense summary', description: 'Expenses grouped by category' },
-  { key: 'net_cash_flow', label: 'Net cash flow', description: 'Received minus expenses per day' },
-  { key: 'outstanding_dues', label: 'Outstanding dues', description: 'Patients who still owe money' },
-  {
-    key: 'payment_methods',
-    label: 'Payment methods',
-    description: 'Receipts grouped by cash, bKash, Nagad, card and bank'
-  },
-  {
-    key: 'treatment_revenue',
-    label: 'Treatment revenue',
-    description: 'Income by treatment, with quantities'
-  },
-  {
-    key: 'invoice_summary',
-    label: 'Invoice summary',
-    description: 'Per-invoice totals, paid and outstanding'
-  },
-  {
-    key: 'expense_categories',
-    label: 'Expense categories',
-    description: 'Category totals with entry counts'
-  },
-  {
-    key: 'inventory_purchases',
-    label: 'Inventory purchases',
-    description: 'Stock-in value per item and supplier'
-  }
-]
 
 function rangeFor(preset: Preset, customFrom: string, customTo: string): { from: string; to: string } {
   const today = todayIso()
@@ -86,7 +51,7 @@ function rangeFor(preset: Preset, customFrom: string, customTo: string): { from:
 export function ReportsPage() {
   const app = useApp()
   const pagination = usePagination(50)
-  const [report, setReport] = useState(REPORTS[0]?.key ?? 'daily_income')
+  const [report, setReport] = useState<string>(REPORT_CATALOGUE[0]?.key ?? 'daily_income')
   const [preset, setPreset] = useState<Preset>('last30')
   const [customFrom, setCustomFrom] = useState(addDaysIso(todayIso(), -29))
   const [customTo, setCustomTo] = useState(todayIso())
@@ -97,7 +62,7 @@ export function ReportsPage() {
   const payload: ReportDataPayload = { report, from: range.from, to: range.to }
   const data = useQuery('reports.data', payload, { deps: [report, range.from, range.to] })
 
-  const active = REPORTS.find((entry) => entry.key === report) ?? REPORTS[0]
+  const active = REPORT_CATALOGUE.find((entry) => entry.key === report) ?? REPORT_CATALOGUE[0]
 
   async function exportCsv(): Promise<void> {
     const result = data.data
@@ -114,9 +79,8 @@ export function ReportsPage() {
     try {
       const folder = await invoke('export.chooseFolder', { title: 'Choose a folder for the report' })
       if (!folder) return
-      const response = await invoke('export.data', {
-        entity: `report_${report}`,
-        format: 'csv',
+      const response = await invoke('reports.export', {
+        report,
         from: range.from,
         to: range.to,
         targetFolder: folder
@@ -204,7 +168,7 @@ export function ReportsPage() {
             label="Report"
             value={report}
             onValueChange={setReport}
-            options={REPORTS.map((entry) => ({ value: entry.key, label: entry.label }))}
+            options={REPORT_CATALOGUE.map((entry) => ({ value: entry.key, label: entry.label }))}
           />
           <Select
             label="Paper"

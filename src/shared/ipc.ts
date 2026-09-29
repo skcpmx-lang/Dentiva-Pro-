@@ -7,6 +7,7 @@
  * and enforces the permission attached to each channel.
  */
 
+import type { ExportEntity } from './constants'
 import type { IpcResult } from './errors'
 import type { PermissionCode, PermissionModule } from './permissions'
 import type {
@@ -308,10 +309,16 @@ export interface IntegrityPayload {
   deep?: boolean
 }
 export interface ExportPayload {
-  entity: string
+  entity: ExportEntity
   format: 'csv' | 'json'
   from?: string | null
   to?: string | null
+  targetFolder: string
+}
+export interface ReportExportPayload {
+  report: string
+  from: string
+  to: string
   targetFolder: string
 }
 export interface ChooseFolderPayload {
@@ -611,6 +618,7 @@ export interface IpcChannelMap {
 
   // Reports / exports / system ------------------------------------------------------------------
   'reports.data': { payload: ReportDataPayload; result: ReportDataResult }
+  'reports.export': { payload: ReportExportPayload; result: ExportResult }
   'print.buildReport': {
     payload: ReportPrintResultPayload
     result: import('./printing/model').ReportDocument

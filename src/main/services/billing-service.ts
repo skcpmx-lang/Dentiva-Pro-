@@ -29,8 +29,9 @@ import {
   sub,
   sum
 } from '@shared/money'
-import { exportFileName, toCsv, type CsvColumn } from '@shared/csv'
-import { ATTACHMENT_LIMITS, type InventoryTransactionType } from '@shared/constants'
+import { exportFileName, toCsv, toCsvRow, type CsvColumn } from '@shared/csv'
+import { buildReportData, type ReportSources } from './reports'
+import { ATTACHMENT_LIMITS, type ExportEntity, type InventoryTransactionType } from '@shared/constants'
 import { containsPattern, formatSequence, sanitizeFileName } from '@shared/ids'
 import type {
   AccountingSummary,
@@ -1038,17 +1039,7 @@ export class BillingService {
   // -------------------------------------------------------------------------------------------
 
   exportData(request: {
-    entity:
-      | 'patients'
-      | 'invoices'
-      | 'payments'
-      | 'expenses'
-      | 'inventory'
-      | 'appointments'
-      | 'visits'
-      | 'prescriptions'
-      | 'staff'
-      | 'audit'
+    entity: ExportEntity
     format: 'csv' | 'json'
     from?: string | null
     to?: string | null
@@ -1063,7 +1054,7 @@ export class BillingService {
             ? 'reports.financial.export'
             : request.entity === 'expenses'
               ? 'accounting.export'
-              : request.entity === 'inventory'
+              : request.entity === 'inventory' || request.entity === 'inventory_movements'
                 ? 'inventory.export'
                 : 'data.export'
     this.require(permission)
@@ -1118,8 +1109,73 @@ export class BillingService {
     return { filePath: target, rowCount: rows.length, bytes }
   }
 
+  /**
+   * Report export (master §61): renders the same figures the Reports screen shows — one builder, so the
+   * exported CSV and the screen can never disagree — with the report's own column headers, its summary
+   * block and its foot notes appended, under the `reports.financial.export` permission.
+   */
+  exportReport(request: { report: string; from: string; to: string; targetFolder: string }): ExportResult {
+    this.require('reports.financial.export')
+
+    const folder = request.targetFolder
+    if (!isAbsolute(folder)) {
+      throw validationError('Choose a folder to export into.', [
+        { field: 'targetFolder', message: 'An absolute folder path is required.' }
+      ])
+    }
+
+    const sources: ReportSources = {
+      db: this.deps.db,
+      invoices: this.deps.invoices,
+      payments: this.deps.payments,
+      treatments: this.deps.treatments,
+      expenses: this.deps.expenses,
+      billing: this
+    }
+    const data = buildReportData(sources, {
+      report: request.report,
+      from: request.from,
+      to: request.to
+    })
+
+    mkdirSync(folder, { recursive: true })
+    const stamp = nowSql().replace(' ', '_').replace(/:/g, '-')
+    const fileName = exportFileName(`dentiva-report-${request.report}`, stamp, 'csv')
+    const target = resolvePath(folder, fileName)
+
+    // Header row from the report's own columns, then the rows, then the summaries so a reader sees the
+    // totals of exactly what the screen showed.
+    const lines = [toCsvRow(data.columns.map((column) => column.label))]
+    for (const row of data.rows) lines.push(toCsvRow(row as (string | number)[]))
+    if (data.summaries.length > 0) {
+      lines.push('')
+      lines.push(toCsvRow(['Summary', 'Amount']))
+      for (const entry of data.summaries) lines.push(toCsvRow([entry.label, entry.value]))
+    }
+    if (data.footNotes.length > 0) {
+      lines.push('')
+      for (const note of data.footNotes) lines.push(toCsvRow([note]))
+    }
+    const csv = `\uFEFF${lines.join('\r\n')}\r\n`
+    writeFileSync(target, csv, 'utf8')
+    const bytes = Buffer.byteLength(csv, 'utf8')
+
+    this.audit('data.export', `Exported ${data.title} (${request.from} to ${request.to}) to ${fileName}`, {
+      entityType: 'export',
+      entityId: null,
+      after: {
+        report: request.report,
+        format: 'csv',
+        rows: data.rows.length,
+        from: request.from,
+        to: request.to
+      }
+    })
+    return { filePath: target, rowCount: data.rows.length, bytes }
+  }
+
   private collectExportRows(
-    entity: string,
+    entity: ExportEntity,
     from: string,
     to: string
   ): { title: string; rows: Record<string, unknown>[] } {
@@ -1193,6 +1249,22 @@ export class BillingService {
                  FROM inventory_items i LEFT JOIN suppliers s ON s.id = i.supplier_id ORDER BY i.name`
             )
             .all() as Record<string, unknown>[]
+        }
+      case 'inventory_movements':
+        // The movements ledger the inventory screen shows, filtered by the same date range.
+        return {
+          title: 'Inventory movements',
+          rows: db
+            .prepare(
+              `SELECT t.at AS "At", i.code AS "Item Code", i.name AS "Item", t.txn_type AS "Type",
+                      t.quantity_milli AS "Quantity (milli)", t.unit_cost_poisha AS "Unit Cost (poisha)",
+                      b.batch_no AS "Batch", b.expiry_date AS "Expiry", t.reference_type AS "Reference Type",
+                      t.reference_id AS "Reference Id", t.reason AS "Reason", t.user_name AS "Recorded By"
+                 FROM inventory_transactions t JOIN inventory_items i ON i.id = t.item_id
+                 LEFT JOIN inventory_batches b ON b.id = t.batch_id
+                WHERE date(t.at) BETWEEN ? AND ? ORDER BY t.at, t.id`
+            )
+            .all(from, to) as Record<string, unknown>[]
         }
       case 'appointments':
         return {

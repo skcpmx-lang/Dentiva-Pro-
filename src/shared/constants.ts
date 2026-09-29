@@ -285,6 +285,91 @@ export const RELATIONSHIP_TYPES = [
   'other'
 ] as const
 
+/**
+ * Financial report catalogue: the single list the reports screen renders, the router validates and the
+ * report builders implement. Keeping the keys here means a report cannot exist in one layer and be missing
+ * in another (the reports suite asserts every entry produces a real, titled report).
+ */
+export const REPORT_KEYS = [
+  'daily_income',
+  'expense_summary',
+  'net_cash_flow',
+  'outstanding_dues',
+  'payment_methods',
+  'treatment_revenue',
+  'invoice_summary',
+  'expense_categories',
+  'inventory_purchases',
+  'period_summary'
+] as const
+export type ReportKey = (typeof REPORT_KEYS)[number]
+
+/**
+ * The entity families the data-export service can write. The payload schema, the service signature and the
+ * screens all read this list, so an export button can never ask for something the service cannot produce.
+ */
+export const EXPORT_ENTITIES = [
+  'patients',
+  'invoices',
+  'payments',
+  'expenses',
+  'inventory',
+  'inventory_movements',
+  'appointments',
+  'visits',
+  'prescriptions',
+  'staff',
+  'audit'
+] as const
+export type ExportEntity = (typeof EXPORT_ENTITIES)[number]
+
+export interface ReportDefinition {
+  key: ReportKey
+  label: string
+  description: string
+}
+
+export const REPORT_CATALOGUE: readonly ReportDefinition[] = [
+  {
+    key: 'daily_income',
+    label: 'Daily income',
+    description: 'Invoiced, received and net figures for each day'
+  },
+  { key: 'expense_summary', label: 'Expense summary', description: 'Expenses grouped by category' },
+  { key: 'net_cash_flow', label: 'Net cash flow', description: 'Received minus expenses per day' },
+  { key: 'outstanding_dues', label: 'Outstanding dues', description: 'Patients who still owe money' },
+  {
+    key: 'payment_methods',
+    label: 'Payment methods',
+    description: 'Receipts grouped by cash, bKash, Nagad, card and bank'
+  },
+  {
+    key: 'treatment_revenue',
+    label: 'Treatment revenue',
+    description: 'Income by treatment, with quantities'
+  },
+  {
+    key: 'invoice_summary',
+    label: 'Invoice summary',
+    description: 'Per-invoice totals, paid and outstanding'
+  },
+  {
+    key: 'expense_categories',
+    label: 'Expense categories',
+    description: 'Category totals with entry counts'
+  },
+  {
+    key: 'inventory_purchases',
+    label: 'Inventory purchases',
+    description: 'Stock-in value per item and supplier'
+  },
+  {
+    key: 'period_summary',
+    label: 'Period summary',
+    description: 'One-page summary of a chosen period for the monthly review'
+  }
+]
+
 export const NOTIFICATION_CATEGORIES = [
   'appointment',
   'queue',

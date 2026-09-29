@@ -87,6 +87,7 @@ import {
   referralListSchema,
   referralStatusSchema,
   reportDataSchema,
+  reportExportSchema,
   reportPrintSchema,
   rescheduleSchema,
   restoreRequestSchema,
@@ -1185,6 +1186,13 @@ export function createRegistry(): Registry {
       schema: reportDataSchema,
       handler: (ctx, payload) =>
         buildReportData(ctx.services, { report: payload.report, from: payload.from, to: payload.to })
+    },
+    'reports.export': {
+      // The service checks the permission again on its own side; the router entry keeps the request
+      // refused before any file is touched.
+      permission: 'reports.financial.export',
+      schema: reportExportSchema,
+      handler: (ctx, payload) => ctx.services.billing.exportReport(payload)
     },
     'export.data': {
       permission: 'data.export',
