@@ -2,13 +2,16 @@
  * End-to-end harness for the real Electron application.
  *
  * Every test launches `out/main/index.js` through Playwright's Electron support: the real main process,
- * the real preload bridge, the real service layer and a real SQLite database in a throwaway folder. The
- * application data folder is redirected with `APPDATA`, and `app-config.json` points the data root at the
- * temporary folder, so a test run never touches a clinic's records.
+ * the real preload bridge, the real service layer and a real SQLite database in a throwaway folder.
+ *
+ * Isolation matters more than it looks. `APPDATA` alone is not enough on Windows: Electron resolves its
+ * application-data path through the Win32 shell API, which ignores the environment variable, so two test
+ * files would share one database. The application therefore honours an explicit `DENTIVA_DATA_ROOT`
+ * override (the same switch a portable installation uses), and each launch points it at a fresh folder.
  */
 
 import { _electron as electron, expect, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -47,17 +50,16 @@ function temporaryRoot(prefix: string): string {
 
 export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedApp> {
   const appDataDir = options.appDataDir ?? temporaryRoot('dentiva-e2e-appdata-')
-  const dataRoot = join(appDataDir, 'Dentiva Pro', 'Data')
-  const configDir = join(appDataDir, 'Dentiva Pro')
-  mkdirSync(configDir, { recursive: true })
-  // The main process reads `data-root.txt` next to the executable first and the app config second; the
-  // config is what a normal installation uses, so the tests use it too.
-  writeFileSync(join(configDir, 'app-config.json'), JSON.stringify({ dataRoot }, null, 2), 'utf8')
+  const dataRoot = join(appDataDir, 'Data')
+  mkdirSync(dataRoot, { recursive: true })
 
   const app = await electron.launch({
     args: [mainBundle],
     env: {
       ...process.env,
+      // The explicit override is what actually isolates the run (see the note at the top); APPDATA and
+      // LOCALAPPDATA are redirected as well so window state and caches land in the throwaway folder too.
+      DENTIVA_DATA_ROOT: dataRoot,
       APPDATA: appDataDir,
       LOCALAPPDATA: appDataDir,
       // No update checks, no dev server: the test drives the built bundles.
@@ -158,6 +160,21 @@ export async function signInThroughUi(
 /** Wait until the application shell is on screen (sidebar + header). */
 export async function waitForShell(page: Page): Promise<void> {
   await expect(page.getByRole('navigation').first()).toBeVisible({ timeout: 30_000 })
+}
+
+/**
+ * Reload the renderer and settle on the shell after the setup wizard was completed through the bridge
+ * rather than through the interface: the renderer still shows the setup screens, so it has to boot again
+ * and pick up the signed-in session the service created.
+ */
+export async function resumeAfterSetup(page: Page): Promise<void> {
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
+  const passwordField = page.getByLabel(/^password$/i).first()
+  if (await passwordField.isVisible().catch(() => false)) {
+    await signInThroughUi(page)
+  }
+  await waitForShell(page)
 }
 
 /** Navigate with the sidebar and wait for the requested screen. */

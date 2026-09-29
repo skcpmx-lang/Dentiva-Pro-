@@ -132,9 +132,13 @@ or direct component call. Repositories are never reachable from the renderer.
 ## 5. Data storage layout (managed, predictable, portable)
 
 The application never writes into the installation directory (Program Files is read-only in practice).
-The single data root is chosen at setup and stored in `%APPDATA%\Dentiva Pro\config\app-config.json`
-(portable: a `data-root.txt` next to the executable is honoured if present, enabling clinic-managed
-storage on a specific drive).
+The single data root is chosen at setup and stored in `%APPDATA%\Dentiva Pro\config\app-config.json`.
+
+Two overrides are honoured, in this order: the environment variable `DENTIVA_DATA_ROOT` (used by support
+sessions, portable copies and the automated end-to-end runs) and a `data-root.txt` file next to the
+executable (clinic-managed storage on a specific drive). Both are explicit operator instructions; if the
+folder they name cannot be used, the application logs the reason and falls back to the saved/`%APPDATA%`
+location instead of failing to start.
 
 ```
 <DataRoot>/                            default: %APPDATA%\Dentiva Pro\data

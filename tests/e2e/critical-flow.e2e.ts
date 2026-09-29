@@ -16,6 +16,7 @@ import {
   e2eSkipReason,
   invoke,
   launchApp,
+  resumeAfterSetup,
   signInThroughUi,
   waitForShell,
   type LaunchedApp
@@ -131,7 +132,7 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
       },
       activationCode
     })
-    await waitForShell(page)
+    await resumeAfterSetup(page)
   })
 
   test.afterAll(async () => {
@@ -143,7 +144,10 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
     await page.getByRole('link', { name: 'Patients' }).first().click()
     await expect(page.getByRole('button', { name: /new patient/i })).toBeVisible()
 
-    await page.getByRole('button', { name: /new patient/i }).click()
+    await page
+      .getByRole('button', { name: /new patient/i })
+      .first()
+      .click()
     await page.getByLabel('Full name').fill('E2E Flow Patient')
     await page.getByLabel('Name in Bangla').fill('ই২ই রোগী')
     await page.getByLabel('Date of birth').fill('1992-04-11')

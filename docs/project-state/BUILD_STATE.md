@@ -164,6 +164,11 @@ had caught. All four are fixed, with integration coverage:
   `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install` before working.
 * The activation code is supplied through the environment (`DENTIVA_ACTIVATION_CODE`) for tests and the
   preview harness; it is deliberately absent from the repository.
+* The application honours `DENTIVA_DATA_ROOT` (highest priority) and a `data-root.txt` next to the
+  executable to point at a specific data folder. Electron resolves `app.getPath('appData')` through the
+  Win32 shell API, so on Windows the `APPDATA` environment variable alone does **not** isolate a test run —
+  the end-to-end harness therefore uses `DENTIVA_DATA_ROOT`, otherwise two test files would share one clinic
+  database.
 * **Repository secret to configure (blocking the release):** add `DENTIVA_ACTIVATION_CODE` under
   *Settings → Secrets and variables → Actions → New repository secret*. Until it exists, the `integration`,
   `e2e-windows` and Release jobs fail on purpose with an explanatory message instead of reporting a green

@@ -109,7 +109,20 @@ function resolveDataRoot(): { root: string; config: string; fallback: string } {
   const fallback = defaultDataRoot(appDataPath, APP_INFO.defaultDataFolderName)
   const config = configRoot(appDataPath, APP_INFO.defaultDataFolderName)
 
-  // 1. A `data-root.txt` next to the executable always wins (portable / clinic-server installs).
+  // 1. An explicit override in the environment wins over everything: it is how a portable copy, a support
+  // session or an automated run points the application at a specific data folder.
+  const override = (process.env.DENTIVA_DATA_ROOT ?? '').trim()
+  if (override !== '') {
+    const absolute = resolve(override)
+    try {
+      mkdirSync(absolute, { recursive: true })
+      return { root: absolute, config, fallback }
+    } catch (error) {
+      logger?.warn(`The data folder from DENTIVA_DATA_ROOT is not usable: ${String(error)}`)
+    }
+  }
+
+  // 2. A `data-root.txt` next to the executable (portable / clinic-server installs).
   try {
     const portable = join(process.execPath, '..', 'data-root.txt')
     if (existsSync(portable)) {
@@ -124,7 +137,7 @@ function resolveDataRoot(): { root: string; config: string; fallback: string } {
     logger?.warn(`The portable data-root.txt could not be used: ${String(error)}`)
   }
 
-  // 2. The folder the clinic chose in the setup wizard.
+  // 3. The folder the clinic chose in the setup wizard.
   const saved = loadAppConfig(config)
   if (saved.dataRoot && saved.dataRoot.trim().length > 0) {
     const absolute = resolve(saved.dataRoot.trim())
@@ -136,7 +149,7 @@ function resolveDataRoot(): { root: string; config: string; fallback: string } {
     }
   }
 
-  // 3. %APPDATA%\Dentiva Pro\data
+  // 4. %APPDATA%\Dentiva Pro\data
   return { root: fallback, config, fallback }
 }
 
