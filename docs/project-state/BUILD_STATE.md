@@ -1,12 +1,14 @@
 # Dentiva Pro — Build State (resume protocol)
 
 > **If you are resuming this project: read this file first, then inspect the repository
-> (`git log --oneline -10`, `git status`, run the test suite, check CI status). Finish the
+> (`git log --oneline -12`, `git status`, run the test suite, check CI status). Finish the
 > in-progress task before starting the next one. Never redo completed work.**
+> The feature-by-feature status lives in `IMPLEMENTATION_CHECKLIST.md` (same folder); the requirement
+> matrix lives in `docs/testing/ACCEPTANCE_TEST_CHECKLIST.md`.
 
 ```yaml
 project: Dentiva Pro
-current_phase: 4 - Feature implementation (core platform complete, feature surface in progress)
+current_phase: 5 - Verification and delivery (feature surface implemented, acceptance evidence being built)
 branch: arena/01a0ee4f-dentiva-pro
 last_updated: 2026-09-29
 ```
@@ -16,57 +18,72 @@ last_updated: 2026-09-29
 | Area | State |
 |---|---|
 | Requirements, architecture, ADRs, DB design, RBAC, design system, print, backup, testing docs | **Complete** |
-| Project scaffolding (Electron + TS + React + SQLite + electron-builder + CI) | **Complete** |
-| Database schema + migrations + repositories | In progress |
-| Services + IPC router (business-layer authorization) | In progress |
-| Renderer design system + shell | In progress |
-| Feature modules (patients, visits, chart, appointments, queue, prescriptions, invoices, payments, inventory, accounting, reports, staff, users, attachments, search, notifications, backup/restore, settings) | In progress |
-| Tests (unit / integration / component / E2E) | In progress |
-| GitHub Actions CI + packaging | Workflows authored, first run pending |
-| Windows installer build + E2E on windows-latest | Pending |
-| Release (GitHub Release or `dist/`) | Pending |
+| Project scaffolding (Electron + TS + React + SQLite + electron-builder) | **Complete** |
+| Database schema + migrations + repositories | **Complete** (migrations 0001–0003; fixture/checksum tests pending) |
+| Services + IPC router (business-layer authorization) | **Complete** (~140 channels, every service checks permissions) |
+| Renderer design system + shell + feature screens | **Complete** (prescriptions screen rewrite outstanding) |
+| Unit tests | **48 passing** (money, date, ids, dental, csv) |
+| Integration tests | **46 passing** (setup/auth 9, clinical 9, billing 13, backup/audit 15) |
+| End-to-end (Electron) suites | **Written, first run pending on windows-latest** |
+| Performance measurement (NFR-003) | **Measured** — `docs/testing/PERFORMANCE_MEASUREMENTS.md` |
+| Dependency/licence audit + third-party notices | **Complete** (`npm run audit:deps`, `npm run licenses`) |
+| GitHub Actions CI + release pipeline | **Authored** — first run pending on push |
+| Windows installer build, clean-machine test | **Pending** (windows-latest) |
+| Release (GitHub Release or `dist/`) | **Pending** |
 
 ## Machine-readable task state
 
 ```yaml
-current_task: DB schema + core repositories and services
-next_task: Patients + visits + chart services and UI
+current_task: Prescriptions screen rewrite against the real IPC channels
+next_task: Unit-test batches (password/session/activation, permissions, printing, validation)
 completed:
-  - docs/* (requirements, architecture, ADRs, database, security, ux, printing, backup-restore, testing, release, compliance plan, project-state)
-  - package.json, tsconfig(s), electron.vite.config.ts, vitest.config.ts, eslint, prettier, electron-builder.yml, installer.nsh, playwright.config
-  - .gitignore, README.md
+  - docs/* (requirements, architecture, ADRs, database, security, ux, printing, backup-restore, testing, compliance, project-state, user guide)
+  - src/shared/** (money incl. fromDecimalString, date, ids, dental, csv, permissions, validation, constants, printing models)
+  - src/main/db/** (connection, migrations, integrity, repositories-core/clinical/billing)
+  - src/main/security/** (activation verifier, scrypt passwords, session, audit hash chain)
+  - src/main/services/** (container, auth, setup, clinical, billing, admin, reports, headless host)
+  - src/main/ipc/** (registry v2 + router with live-container resolution), preload bridge
+  - src/renderer/** (design system, shell, all feature screens)
+  - integration suites (setup-auth, clinical, billing, backup-audit)
+  - unit suites (money, date, dental-ids-csv)
+  - maintenance tooling (dependency audit, third-party notices, backup verifier, release artifact verifier, stress seeder, preview harness)
+  - GitHub Actions ci.yml + release.yml, Playwright config + e2e suites
 in_progress:
-  - src/shared/** (money, quantity, dates, permissions, validation, constants, printing models)
-  - src/main/db/** (connection, migrations, integrity)
+  - Prescriptions screen (features/prescriptions/PrescriptionsPage.tsx) against prescriptions.* / patients.lookup / clinical.options / print.build → print.job
 failed_tests: []
-known_issues: []
+known_issues:
+  - Electron cannot run in the development sandbox (no binary), so E2E, PDF fidelity, print matrix and DPI checks only run on windows-latest.
+  - Empty folders kept out of git (for example an empty attachments directory) must be created by the code at runtime; do not re-add committed placeholder files.
 pending_fixes: []
-last_successful_build: not yet (first build pending)
-last_successful_test: not yet (first test run pending)
+last_successful_build: green (electron-vite build, out/renderer ~1.45 MB js + 49 kB css)
+last_successful_test: 94 passing (48 unit + 46 integration), plus the stress run and both verification scripts
 ```
 
 ## Environment notes (important for resuming)
 
-* The sandbox has **no Windows, no Wine and no access to GitHub release assets**
-  (`release-assets.githubusercontent.com` is blocked), therefore:
-  * The Electron binary cannot be downloaded here. `npm install` in the sandbox must be run with
-    `ELECTRON_SKIP_BINARY_DOWNLOAD=1` (the Electron *npm package* and all tooling install fine).
-    Electron runs only in GitHub Actions (`windows-latest`), where the binary downloads normally.
-  * `better-sqlite3@13` ships N-API prebuilds inside the npm package (including `win32-x64`), so no
-    compilation or binary download is needed anywhere.
-* UI/UX verification and live previews in the sandbox use the development web harness
-  (`npm run preview:harness`), which serves the renderer through Vite and proxies the real
-  `invoke(channel, payload)` contract to the real main-process router and services over a local Node host
-  with a real SQLite database. This harness is development-only and never active in packaged builds
-  (`VITE_DENTIVA_WEB_HARNESS`).
+* The sandbox has **no Windows, no Wine and no access to GitHub release assets**; the Electron binary
+  cannot be downloaded here.
+  * Install with `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install`.
+  * Electron-dependent verification (E2E, installer, PDF fidelity, print matrix, DPI) happens in GitHub
+    Actions on `windows-latest`, or on a real Windows machine.
+* `better-sqlite3@13` ships N-API prebuilds (including `win32-x64`), so no compiler is needed anywhere.
+* UI review in the sandbox uses the **browser preview harness**:
+  `npm run build:app && DENTIVA_ACTIVATION_CODE=… node scripts/preview-server.mjs --port 4173`.
+  It serves the production renderer and runs the real service container, router and database behind it;
+  printing and PDF export are the only features it refuses (they need Chromium's desktop pipeline).
 * `node_modules/` is not preserved between sessions — re-run
   `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install` before working.
+* The activation code is supplied through the environment (`DENTIVA_ACTIVATION_CODE`) for tests and the
+  preview harness; it is deliberately absent from the repository.
 
 ## How to resume in 5 steps
 
-1. `git log --oneline -8 && git status` — confirm the branch and latest commit.
-2. Read the `Machine-readable task state` block above (`in_progress` → finish it first).
-3. `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install` then `npm run verify` to see the current test state.
-4. Continue with `next_task`, maintaining this file at the end of the turn.
-5. Update `docs/project-state/IMPLEMENTATION_CHECKLIST.md` and, when release gates pass,
-   `RELEASE_READINESS.md`.
+1. `git log --oneline -12 && git status` — confirm the branch, the latest commit and that the tree is clean.
+2. Read `IMPLEMENTATION_CHECKLIST.md` and continue the first **Partial**/**Open** item that the
+   `machine-readable task state` above names as `current_task`.
+3. `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install`, then `npm run verify`
+   (lint + typecheck + tests with coverage) to see the current state.
+4. `DENTIVA_ACTIVATION_CODE=… npx vitest run --config vitest.config.ts` for the integration suites.
+5. Finish the task, run all gates (`npm run lint`, `npm run typecheck`, `npm run test`,
+   `npm run audit:deps`, and for data changes `node scripts/seed-stress-data.mjs`), commit with a
+   conventional message, and update this file plus `IMPLEMENTATION_CHECKLIST.md` at the end of the turn.
