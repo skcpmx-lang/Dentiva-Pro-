@@ -1,7 +1,7 @@
 # Dentiva Pro — Release Readiness
 
 **Document ID:** REL-READY-001 · **Version:** 1.0.0 · **Status reviewed:** 2026-09-30
-**Branch:** `arena/01a0ee4f-dentiva-pro` · **Commits reviewed:** see the table in *Build identity* below.
+**Branch:** `main` (session work branches off it) · **Commits reviewed:** see the table in *Build identity* below.
 
 This document is the honest answer to one question: **can this commit be shipped to a clinic today?**
 It is written by the person who ran the gates, records what was actually executed (and where), lists every
@@ -15,7 +15,7 @@ Reading order: *Verdict* → *Gates* → *Pending evidence* → *Known deviation
 | Question | Answer |
 |---|---|
 | Is the source complete for the agreed scope? | **Yes** — every feature in `docs/requirements/` is implemented, reachable from the interface and covered by the traceability matrix. |
-| Are the automated gates green? | **Locally yes** (lint, typecheck, build, unit, integration, maintenance tools, pre-release audits), and on GitHub the quality, maintenance and integration jobs are green — the integration job runs the whole 110-test suite with the activation secret instead of skipping it. The Windows end-to-end job now executes the Electron suite; it is failing and its output is published as a job annotation while the failures are worked through. |
+| Are the automated gates green? | **Locally yes** (lint, typecheck, build, unit, integration, maintenance tools, pre-release audits), and on GitHub the quality, maintenance and integration jobs are green — the integration job runs the whole suite with the activation secret instead of skipping it. The Windows end-to-end job now executes the Electron suite; it is failing and its output is published as a job annotation while the failures are worked through. The first windows-latest run of the *fast* suites (release run 36639642068, "Tests" step) failed with 12 EBUSY errors; the root cause (a leaked read-only backup-verification connection, see correction 13 in `BUILD_STATE.md`) is fixed with a regression test, and a `windows-tests` CI job now runs those suites on windows-latest on every push. |
 | Has a Windows installer been built and installed on a clean machine? | **No — this has never been executed.** The development sandbox has no Windows host, no Wine and no Electron binary, so packaging, install, print, PDF, DPI and Electron end-to-end evidence can only be produced by the `windows-latest` jobs of `.github/workflows/ci.yml` / `release.yml`. |
 | Is there a releasable artefact? | **Not yet.** Until the Windows jobs run, `release/` is empty and `scripts/verify-release-artifact.mjs` fails by design. |
 | Release decision | **Not releasable yet.** The remaining work is *evidence*, not code: run the Windows jobs, then re-check the tables below. |
@@ -56,7 +56,12 @@ manual DPI/timing measurement, or packaging/CI infrastructure).
 ## Pending evidence (what is not yet proven)
 
 1. **Windows installer** — build, PE architecture, embedded version/build/commit, checksums
-   (`release.yml` → `package:win` → `verify:installer`). Blocks `AT-A06`, `AT-H03`, `AT-H04`.
+   (`release.yml` → `package:win` → `verify:installer`). Blocks `AT-A06`, `AT-H03`, `AT-H04`. Status: the
+   release job now passes checkout/install/lint/typecheck/secret gate on windows-latest; its "Tests" step
+   (first vitest run on Windows) failed in run 36639642068 with 12 EBUSY teardown errors caused by the
+   `closeDatabase` handle leak (fixed, regression-tested). The tag is being re-pointed to the fix commit
+   and the next tag-triggered run must be green end to end before the installer can be claimed. The GitHub
+   release, when it exists, must stay a **DRAFT** until every gate in this document is verified.
 2. **Install / uninstall / data preservation on a clean machine** — blocks `AT-A06`.
 3. **Electron end-to-end suites** (setup wizard, critical flow, keyboard shortcuts, empty/loading/error
    states) — blocks `AT-A07`, `AT-G01`, `AT-G02`, `AT-G03`, `AT-G04`, `AT-I01`.

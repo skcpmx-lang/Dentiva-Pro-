@@ -145,7 +145,9 @@ export function createHarness(): Harness {
       } catch {
         // already closed
       }
-      rmSync(root, { recursive: true, force: true })
+      // Windows holds transient locks (antivirus scans of freshly written files), so a single
+      // attempt can lose a race; the e2e harness uses the same retries.
+      rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
     }
   }
 }
