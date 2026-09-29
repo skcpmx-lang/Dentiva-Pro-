@@ -840,10 +840,23 @@ BEGIN
 END;
 `
 
+const MIGRATION_0004 = `
+-- ============================================================================================
+-- 0004_prescription_void_reason — a voided prescription keeps why and when it was voided
+-- ============================================================================================
+
+ALTER TABLE prescriptions ADD COLUMN void_reason TEXT;
+ALTER TABLE prescriptions ADD COLUMN voided_at TEXT;
+
+-- The register filters by status (draft / final / void) on every screen.
+CREATE INDEX idx_prescriptions_status ON prescriptions (status);
+`
+
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: '0001_initial_schema', sql: MIGRATION_0001 },
   { version: 2, name: '0002_indexes', sql: MIGRATION_0002 },
-  { version: 3, name: '0003_audit_immutability', sql: MIGRATION_0003 }
+  { version: 3, name: '0003_audit_immutability', sql: MIGRATION_0003 },
+  { version: 4, name: '0004_prescription_void_reason', sql: MIGRATION_0004 }
 ]
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? 0

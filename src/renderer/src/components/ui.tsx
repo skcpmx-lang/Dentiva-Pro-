@@ -777,7 +777,11 @@ export interface ConfirmOptions {
   typeToConfirm?: string
   /** When true, the dialog also asks for the signed-in user's password. */
   requirePassword?: boolean
-  onConfirm: (input: { confirmationPhrase: string; password: string }) => Promise<void> | void
+  /** When set, the dialog asks for a written reason and hands it to `onConfirm` (voiding, restoring…). */
+  reasonLabel?: string
+  reasonHint?: string
+  reasonMinLength?: number
+  onConfirm: (input: { confirmationPhrase: string; password: string; reason: string }) => Promise<void> | void
 }
 
 interface ConfirmContextValue {
@@ -790,20 +794,24 @@ export function ConfirmProvider({ children }: { children: ReactNode }): React.Re
   const [pending, setPending] = useState<ConfirmOptions | null>(null)
   const [phrase, setPhrase] = useState('')
   const [password, setPassword] = useState('')
+  const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const confirm = useCallback((options: ConfirmOptions) => {
     setPhrase('')
     setPassword('')
+    setReason('')
     setError(null)
     setPending(options)
   }, [])
 
   const value = useMemo(() => ({ confirm }), [confirm])
+  const reasonMinLength = pending?.reasonLabel ? (pending.reasonMinLength ?? 3) : 0
   const ready =
     (!pending?.typeToConfirm || phrase === pending.typeToConfirm) &&
-    (!pending?.requirePassword || password.length > 0)
+    (!pending?.requirePassword || password.length > 0) &&
+    reason.trim().length >= reasonMinLength
 
   return (
     <ConfirmContext.Provider value={value}>
@@ -824,7 +832,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }): React.Re
                   setBusy(true)
                   setError(null)
                   try {
-                    await pending.onConfirm({ confirmationPhrase: phrase, password })
+                    await pending.onConfirm({ confirmationPhrase: phrase, password, reason: reason.trim() })
                     setPending(null)
                   } catch (cause) {
                     setError(cause instanceof Error ? cause.message : String(cause))
@@ -839,6 +847,18 @@ export function ConfirmProvider({ children }: { children: ReactNode }): React.Re
           }
         >
           <p>{pending.message}</p>
+          {pending.reasonLabel ? (
+            <TextInput
+              label={pending.reasonLabel}
+              hint={
+                pending.reasonHint ??
+                `At least ${reasonMinLength} characters. The reason is kept in the audit log.`
+              }
+              value={reason}
+              onValueChange={setReason}
+              autoFocus={!pending.typeToConfirm}
+            />
+          ) : null}
           {pending.typeToConfirm ? (
             <TextInput
               label={`Type "${pending.typeToConfirm}" to continue`}

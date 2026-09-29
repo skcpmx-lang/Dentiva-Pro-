@@ -12,6 +12,7 @@ import {
   GENDERS,
   INVENTORY_TRANSACTION_TYPES,
   PASSWORD_POLICY,
+  PRESCRIPTION_WRITE_STATUSES,
   QUEUE_PRIORITIES,
   REFERRAL_STATUSES,
   STAFF_STATUSES,
@@ -364,6 +365,8 @@ export const prescriptionInputSchema = z.object({
   advice: z.array(trimmed(300)).max(20).default([]),
   followUpDate: isoDateSchema.nullable().optional(),
   notes: optionalText(1000),
+  // Saving as `final` is what the print/reprint path uses; voiding has its own action and payload.
+  status: z.enum(PRESCRIPTION_WRITE_STATUSES).optional(),
   items: z.array(prescriptionItemSchema).min(1, 'Add at least one medicine.').max(30)
 })
 

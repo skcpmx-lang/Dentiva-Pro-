@@ -192,6 +192,12 @@ export const QUEUE_PRIORITY_LABELS: Record<QueuePriority, string> = {
 export const VISIT_STATUSES = ['draft', 'final', 'amended'] as const
 export type VisitStatus = (typeof VISIT_STATUSES)[number]
 
+export const PRESCRIPTION_STATUSES = ['draft', 'final', 'void'] as const
+export type PrescriptionStatus = (typeof PRESCRIPTION_STATUSES)[number]
+/** Statuses a prescription may be saved with; `void` is only reachable through the void action. */
+export const PRESCRIPTION_WRITE_STATUSES = ['draft', 'final'] as const
+export type PrescriptionWriteStatus = (typeof PRESCRIPTION_WRITE_STATUSES)[number]
+
 export const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
   draft: 'Draft',
   final: 'Finalised',

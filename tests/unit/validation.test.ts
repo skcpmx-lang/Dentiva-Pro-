@@ -238,6 +238,10 @@ describe('clinical payloads', () => {
       ]
     }
     expect(passes(prescriptionInputSchema, prescription)).toBe(true)
+    // Finalising travels through the same payload; voiding has its own action and can never be smuggled in.
+    expect(passes(prescriptionInputSchema, { ...prescription, status: 'draft' })).toBe(true)
+    expect(passes(prescriptionInputSchema, { ...prescription, status: 'final' })).toBe(true)
+    expect(issues(prescriptionInputSchema, { ...prescription, status: 'void' })).not.toHaveLength(0)
     expect(issues(prescriptionInputSchema, { ...prescription, items: [] })).toContainEqual(
       expect.stringContaining('at least one medicine')
     )

@@ -826,6 +826,10 @@ export class PrescriptionRepository {
       where.push('r.prescription_date <= @to')
       params.to = query.to
     }
+    if (query.status) {
+      where.push('r.status = @status')
+      params.status = query.status
+    }
     if (query.search?.trim()) {
       where.push(
         `(p.full_name LIKE @search ESCAPE '\\' OR p.code LIKE @search ESCAPE '\\' OR r.diagnosis LIKE @search ESCAPE '\\')`
@@ -877,6 +881,8 @@ export class PrescriptionRepository {
       followUpDate: (row.follow_up_date as string) ?? null,
       notes: (row.notes as string) ?? null,
       status: row.status as Prescription['status'],
+      voidReason: (row.void_reason as string) ?? null,
+      voidedAt: (row.voided_at as string) ?? null,
       printedCount: row.printed_count as number,
       lastPrintedAt: (row.last_printed_at as string) ?? null,
       items: this.items(id),
@@ -963,7 +969,8 @@ export class PrescriptionRepository {
           `UPDATE prescriptions SET patient_id = @patientId, visit_id = @visitId, dentist_id = @dentistId,
                   prescription_date = @prescriptionDate, chief_complaints_json = @chiefComplaints,
                   on_examination_json = @onExamination, diagnosis = @diagnosis, advice_json = @advice,
-                  follow_up_date = @followUpDate, notes = @notes, status = @status,
+                  follow_up_date = @followUpDate, notes = @notes,
+                  status = COALESCE(@status, status),
                   updated_at = @updatedAt, updated_by = @updatedBy
             WHERE id = @id`
         )
@@ -979,7 +986,8 @@ export class PrescriptionRepository {
           advice: JSON.stringify(input.advice ?? []),
           followUpDate: input.followUpDate ?? null,
           notes: input.notes ?? null,
-          status: input.status ?? 'draft',
+          // Omitting the status keeps the stored one: editing a final sheet must not silently draft it.
+          status: input.status ?? null,
           updatedAt: NOW(),
           updatedBy: actor
         })
@@ -1025,10 +1033,15 @@ export class PrescriptionRepository {
       .run(NOW(), id)
   }
 
-  void(id: number, actor: string): void {
+  void(id: number, reason: string, actor: string): void {
+    const at = NOW()
     this.db
-      .prepare("UPDATE prescriptions SET status = 'void', updated_at = ?, updated_by = ? WHERE id = ?")
-      .run(NOW(), actor, id)
+      .prepare(
+        `UPDATE prescriptions SET status = 'void', void_reason = ?, voided_at = ?,
+                                  updated_at = ?, updated_by = ?
+          WHERE id = ?`
+      )
+      .run(reason, at, at, actor, id)
   }
 }
 

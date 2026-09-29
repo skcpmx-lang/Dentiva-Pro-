@@ -565,6 +565,9 @@ export interface Prescription {
   followUpDate: string | null
   notes: string | null
   status: 'draft' | 'final' | 'void'
+  /** Why and when the prescription was voided, kept for the record (a void never deletes medicines). */
+  voidReason: string | null
+  voidedAt: string | null
   printedCount: number
   lastPrintedAt: string | null
   items: PrescriptionItem[]
@@ -1138,6 +1141,7 @@ export interface PrescriptionQuery extends PageQuery {
   from?: string | null
   to?: string | null
   search?: string | null
+  status?: 'draft' | 'final' | 'void' | null
 }
 
 export interface InventoryQuery extends PageQuery {

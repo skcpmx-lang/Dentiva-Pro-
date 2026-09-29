@@ -274,8 +274,9 @@ export function PaymentsPage() {
                               confirmLabel: 'Void receipt',
                               typeToConfirm: 'VOID',
                               requirePassword: app.settings?.requirePasswordOnDestructive ?? true,
-                              onConfirm: async () => {
-                                const result = await voidPayment.run(row.id, 'Voided from the payments list')
+                              reasonLabel: 'Reason for voiding this receipt',
+                              onConfirm: async ({ reason }) => {
+                                const result = await voidPayment.run(row.id, reason)
                                 if (result.ok) {
                                   app.toast({ tone: 'success', title: 'Receipt voided' })
                                   payments.reload()

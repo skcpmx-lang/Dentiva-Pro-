@@ -278,7 +278,14 @@ export function PrescriptionsPage() {
                 key: 'status',
                 header: 'Status',
                 render: (row: Prescription) => (
-                  <Badge tone={statusTone(row.status)}>{prescriptionStatusLabel(row.status)}</Badge>
+                  <div>
+                    <Badge tone={statusTone(row.status)}>{prescriptionStatusLabel(row.status)}</Badge>
+                    {row.status === 'void' && row.voidReason ? (
+                      <p className="text-muted" style={{ margin: '4px 0 0', fontSize: 12 }}>
+                        {row.voidReason}
+                      </p>
+                    ) : null}
+                  </div>
                 )
               },
               {
@@ -289,7 +296,7 @@ export function PrescriptionsPage() {
                     <Button size="sm" variant="ghost" onClick={() => setDetailId(row.id)}>
                       Open
                     </Button>
-                    {app.hasPermission('prescriptions.print') ? (
+                    {app.hasPermission('prescriptions.print') && row.status !== 'void' ? (
                       <Button
                         size="sm"
                         title="Preview and print"
@@ -334,8 +341,10 @@ export function PrescriptionsPage() {
                             tone: 'danger',
                             confirmLabel: 'Void prescription',
                             typeToConfirm: 'VOID',
-                            onConfirm: async () => {
-                              const result = await voidAction.run(row.id, 'Voided from the prescription list')
+                            requirePassword: app.settings?.requirePasswordOnDestructive ?? true,
+                            reasonLabel: 'Reason for voiding this prescription',
+                            onConfirm: async ({ reason }) => {
+                              const result = await voidAction.run(row.id, reason)
                               if (result.ok) {
                                 app.toast({ tone: 'success', title: 'Prescription voided' })
                                 list.reload()
@@ -395,7 +404,7 @@ export function PrescriptionsPage() {
               >
                 Open patient
               </Button>
-              {app.hasPermission('prescriptions.print') ? (
+              {app.hasPermission('prescriptions.print') && detail.data?.status !== 'void' ? (
                 <Button
                   size="sm"
                   variant="primary"
@@ -433,6 +442,13 @@ export function PrescriptionsPage() {
                     {prescriptionStatusLabel(detail.data.status)}
                   </Badge>{' '}
                   · printed {detail.data.printedCount} time(s)
+                  {detail.data.status === 'void' && detail.data.voidedAt ? (
+                    <>
+                      {' '}
+                      · voided {formatDate(detail.data.voidedAt.slice(0, 10))} (
+                      {detail.data.voidReason ?? 'no reason given'})
+                    </>
+                  ) : null}
                 </dd>
               </dl>
               <Section title="C/C — Chief complaints" lines={detail.data.chiefComplaints} />

@@ -214,8 +214,127 @@ suite('visits and dental chart', () => {
     } as never)
     expect(reordered.items[0]?.medicineName).toBe('Paracetamol')
 
-    harness.services.clinical.voidPrescription(prescription.id)
-    expect(harness.services.clinical.getPrescription(prescription.id).status).toBe('void')
+    // Finalising is a real status change: it is what the print path hands to the patient.
+    const finalised = harness.services.clinical.updatePrescription(prescription.id, {
+      ...reordered,
+      status: 'final'
+    } as never)
+    expect(finalised.status).toBe('final')
+
+    // An edit that does not mention the status must not silently turn the sheet back into a draft.
+    const edited = harness.services.clinical.updatePrescription(prescription.id, {
+      ...finalised,
+      status: undefined,
+      items: finalised.items
+    } as never)
+    expect(edited.status).toBe('final')
+
+    harness.services.clinical.voidPrescription(prescription.id, 'Wrong medicine written')
+    const voided = harness.services.clinical.getPrescription(prescription.id)
+    expect(voided.status).toBe('void')
+    expect(voided.voidReason).toBe('Wrong medicine written')
+    expect(voided.voidedAt).not.toBeNull()
+
+    // A voided sheet is part of the record: it can no longer be edited or handed out again.
+    expect(() => harness.services.clinical.voidPrescription(prescription.id, 'Again')).toThrow(
+      /already void/i
+    )
+    expect(() => harness.services.clinical.updatePrescription(prescription.id, finalised as never)).toThrow(
+      /voided/i
+    )
+    expect(() => harness.services.admin.buildPrescriptionDocumentPrint(prescription.id)).toThrow(/voided/i)
+    expect(() => harness.services.clinical.voidPrescription(prescription.id, 'no')).toThrow()
+
+    // The reason the clinic typed is kept in the audit trail as well as on the record.
+    const audit = harness.services.admin.listAudit({ page: 1, pageSize: 50, action: 'prescriptions.void' })
+    expect(audit.rows[0]?.summary).toContain('Wrong medicine written')
+  })
+
+  it('filters the prescription register by status, patient and date', () => {
+    const patient = harness.services.clinical.createPatient(patientInput({ fullName: 'Filter Person' }))
+    const draft = harness.services.clinical.createPrescription({
+      patientId: patient.id,
+      dentistId,
+      prescriptionDate: '2026-09-29',
+      chiefComplaints: ['Routine review'],
+      onExamination: ['No active caries'],
+      advice: ['Continue brushing twice daily'],
+      items: [
+        {
+          sortOrder: 0,
+          medicineName: 'Ibuprofen',
+          medicineType: 'Tablet',
+          strength: '400 mg',
+          dose: '1 tablet',
+          morning: null,
+          noon: '1',
+          night: null,
+          timing: 'After food',
+          durationValue: 3,
+          durationUnit: 'days',
+          quantity: '3 tablets',
+          instruction: null,
+          conditionalInstruction: null,
+          notes: null
+        }
+      ]
+    })
+    const final = harness.services.clinical.createPrescription({
+      patientId: patient.id,
+      dentistId,
+      prescriptionDate: '2026-09-30',
+      chiefComplaints: ['Swelling in the lower left'],
+      onExamination: ['Pericoronitis 38'],
+      advice: ['Warm salt rinse', 'Return if the swelling spreads'],
+      status: 'final',
+      items: [
+        {
+          sortOrder: 0,
+          medicineName: 'Metronidazole',
+          medicineType: 'Tablet',
+          strength: '400 mg',
+          dose: '1 tablet',
+          morning: '1',
+          noon: null,
+          night: '1',
+          timing: 'After food',
+          durationValue: 5,
+          durationUnit: 'days',
+          quantity: '10 tablets',
+          instruction: null,
+          conditionalInstruction: null,
+          notes: null
+        }
+      ]
+    })
+
+    expect(draft.status).toBe('draft')
+    expect(final.status).toBe('final')
+
+    const drafts = harness.services.clinical.listPrescriptions({
+      page: 1,
+      pageSize: 50,
+      patientId: patient.id,
+      status: 'draft'
+    })
+    expect(drafts.rows.map((row) => row.id)).toEqual([draft.id])
+
+    const finals = harness.services.clinical.listPrescriptions({
+      page: 1,
+      pageSize: 50,
+      patientId: patient.id,
+      status: 'final'
+    })
+    expect(finals.rows.map((row) => row.id)).toEqual([final.id])
+
+    const range = harness.services.clinical.listPrescriptions({
+      page: 1,
+      pageSize: 50,
+      patientId: patient.id,
+      from: '2026-09-30',
+      to: '2026-09-30'
+    })
+    expect(range.rows.map((row) => row.id)).toEqual([final.id])
   })
 
   it('keeps referrals linked to the patient record', () => {

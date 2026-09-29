@@ -674,6 +674,9 @@ export class AdminService {
     this.require('prescriptions.print')
     const prescription = this.deps.prescriptions.findById(prescriptionId)
     if (!prescription) throw notFound('Prescription', prescriptionId)
+    if (prescription.status === 'void') {
+      throw conflict('This prescription was voided and cannot be printed or exported.')
+    }
     const settings = this.deps.settings.get()
     const paper = resolvePaper(this.paperKeyOf(paperKey ?? settings.prescriptionPaper))
     const clinic = this.deps.clinic.get()

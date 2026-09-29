@@ -443,6 +443,11 @@ export class ClinicalService {
         { field: 'items', message: 'A prescription needs at least one medicine.' }
       ])
     }
+    if ((input.status as string | undefined) === 'void') {
+      throw validationError('Use the void action to cancel a prescription.', [
+        { field: 'status', message: 'A prescription cannot be created as void.' }
+      ])
+    }
     const id = this.deps.prescriptions.create(input, this.deps.session.username ?? 'system')
     this.audit(
       'prescriptions.create',
@@ -460,26 +465,50 @@ export class ClinicalService {
     this.require('prescriptions.edit')
     const existing = this.deps.prescriptions.findById(id)
     if (!existing) throw notFound('Prescription', id)
+    if (existing.status === 'void') {
+      throw conflict('This prescription was voided and can no longer be edited.')
+    }
+    if ((input.status as string | undefined) === 'void') {
+      throw validationError('Use the void action to cancel a prescription.', [
+        { field: 'status', message: 'Use the void action to cancel a prescription.' }
+      ])
+    }
+    const nextStatus = input.status ?? existing.status
     this.deps.prescriptions.update(id, input, this.deps.session.username ?? 'system')
-    this.audit('prescriptions.update', `Updated prescription #${id}`, {
-      entityType: 'prescription',
-      entityId: id,
-      before: { itemCount: existing.items.length },
-      after: { itemCount: input.items.length }
-    })
+    this.audit(
+      'prescriptions.update',
+      nextStatus !== existing.status ? `Finalised prescription #${id}` : `Updated prescription #${id}`,
+      {
+        entityType: 'prescription',
+        entityId: id,
+        before: { itemCount: existing.items.length, status: existing.status },
+        after: { itemCount: input.items.length, status: nextStatus }
+      }
+    )
     return this.deps.prescriptions.findById(id) as Prescription
   }
 
-  voidPrescription(id: number): void {
+  voidPrescription(id: number, reason: string): void {
     this.require('prescriptions.delete')
     const existing = this.deps.prescriptions.findById(id)
     if (!existing) throw notFound('Prescription', id)
-    this.deps.prescriptions.void(id, this.deps.session.username ?? 'system')
-    this.audit('prescriptions.void', `Voided prescription #${id}`, {
-      entityType: 'prescription',
-      entityId: id,
-      severity: 'warning'
-    })
+    if (existing.status === 'void') throw conflict('This prescription is already void.')
+    const trimmed = (reason ?? '').trim()
+    if (trimmed.length < 3) {
+      throw validationError('Enter a reason for voiding this prescription.', [
+        { field: 'reason', message: 'A reason of at least 3 characters is required.' }
+      ])
+    }
+    const actor = this.deps.session.username ?? 'system'
+    this.deps.db.transaction(() => {
+      this.deps.prescriptions.void(id, trimmed, actor)
+      this.audit('prescriptions.void', `Voided prescription #${id}: ${trimmed}`, {
+        entityType: 'prescription',
+        entityId: id,
+        before: { status: existing.status },
+        severity: 'warning'
+      })
+    })()
   }
 
   // -------------------------------------------------------------------------------------------

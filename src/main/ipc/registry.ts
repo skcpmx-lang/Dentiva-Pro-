@@ -503,7 +503,7 @@ export function createRegistry(): Registry {
       schema: prescriptionVoidSchema,
       audit: 'prescription.void',
       handler: (ctx, payload) => {
-        ctx.services.clinical.voidPrescription(payload.id)
+        ctx.services.clinical.voidPrescription(payload.id, payload.reason)
         return { ok: true as const }
       }
     },

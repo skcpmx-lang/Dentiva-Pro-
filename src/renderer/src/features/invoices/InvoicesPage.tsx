@@ -326,8 +326,9 @@ export function InvoicesPage() {
                             confirmLabel: 'Void invoice',
                             typeToConfirm: 'VOID',
                             requirePassword: app.settings?.requirePasswordOnDestructive ?? true,
-                            onConfirm: async () => {
-                              const result = await voidInvoice.run(row.id, 'Voided from the invoice list')
+                            reasonLabel: 'Reason for voiding this invoice',
+                            onConfirm: async ({ reason }) => {
+                              const result = await voidInvoice.run(row.id, reason)
                               if (result.ok) {
                                 app.toast({ tone: 'success', title: 'Invoice voided' })
                                 list.reload()
@@ -605,11 +606,9 @@ function InvoiceDetail({
                             confirmLabel: 'Void payment',
                             typeToConfirm: 'VOID',
                             requirePassword: app.settings?.requirePasswordOnDestructive ?? true,
-                            onConfirm: async () => {
-                              const result = await voidPayment.run(
-                                payment.id,
-                                'Voided from the invoice screen'
-                              )
+                            reasonLabel: 'Reason for voiding this payment',
+                            onConfirm: async ({ reason }) => {
+                              const result = await voidPayment.run(payment.id, reason)
                               if (result.ok) {
                                 app.toast({ tone: 'success', title: 'Payment voided' })
                                 onChanged()
