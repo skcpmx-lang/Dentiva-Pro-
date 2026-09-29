@@ -142,7 +142,7 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
   test('a patient is registered through the interface and appears in the register', async () => {
     const { page } = app
     await page.getByRole('link', { name: 'Patients' }).first().click()
-    await expect(page.getByRole('button', { name: /new patient/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /new patient/i }).first()).toBeVisible()
 
     await page
       .getByRole('button', { name: /new patient/i })
@@ -150,7 +150,7 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
       .click()
     await page.getByLabel('Full name').fill('E2E Flow Patient')
     await page.getByLabel('Name in Bangla').fill('ই২ই রোগী')
-    await page.getByLabel('Date of birth').fill('1992-04-11')
+    await page.getByLabel('Date of birth', { exact: true }).fill('1992-04-11')
     await page.getByLabel('Phone', { exact: true }).fill('+8801811111111')
     await page.getByLabel('City').fill('Tangail')
     await page.getByRole('button', { name: /register patient/i }).click()

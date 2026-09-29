@@ -104,22 +104,25 @@ export async function invoke<T = unknown>(page: Page, channel: string, payload?:
   return result.data as T
 }
 
-/** Complete the setup wizard through the interface, exactly as a clinic would. */
+/**
+ * Complete the setup wizard through the interface, exactly as a clinic would: activation, clinic profile,
+ * first dentist, administrator, review. Every locator names a field the wizard really has, and the two
+ * multi-value labels are addressed exactly, because "Clinic name in Bangla" and "Phone"/"Second phone"
+ * would otherwise match more than one control.
+ */
 export async function completeSetupThroughUi(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: /setup|welcome|activate/i }).first()).toBeVisible({
-    timeout: 30_000
-  })
+  await expect(page.getByRole('heading', { name: /set up dentiva pro/i })).toBeVisible({ timeout: 30_000 })
 
-  // Step 1 — activation.
+  // Step 1 — activation (the wizard moves on by itself once the code is accepted).
   await page.getByLabel('Activation code').fill(activationCode)
-  await page.getByRole('button', { name: /activate/i }).click()
+  await page.getByRole('button', { name: /^activate$/i }).click()
 
   // Step 2 — clinic.
   await page.getByLabel('Clinic name', { exact: true }).fill('E2E Dental Care')
-  await page.getByLabel('Address').fill('12 Test Road')
-  await page.getByLabel('City').fill('Dhaka')
-  await page.getByLabel('Postal code').fill('1205')
-  await page.getByLabel('Country').fill('Bangladesh')
+  await page.getByLabel('Address', { exact: true }).fill('12 Test Road')
+  await page.getByLabel('City', { exact: true }).fill('Dhaka')
+  await page.getByLabel('Postal code', { exact: true }).fill('1205')
+  await page.getByLabel('Country', { exact: true }).fill('Bangladesh')
   await page.getByLabel('Phone', { exact: true }).fill('+8801700000000')
   await page.getByRole('button', { name: /^continue$/i }).click()
 
@@ -129,12 +132,13 @@ export async function completeSetupThroughUi(page: Page): Promise<void> {
   await page.getByLabel('Qualifications').first().fill('BDS')
   await page.getByRole('button', { name: /^continue$/i }).click()
 
-  // Step 4 — administrator.
-  await page.getByLabel('Username').fill('admin')
-  await page.getByLabel('Display name').fill('E2E Administrator')
+  // Step 4 — administrator, then the review step that actually writes everything.
+  await page.getByLabel('Username', { exact: true }).fill('admin')
+  await page.getByLabel('Display name', { exact: true }).fill('E2E Administrator')
   await page.getByLabel('Password', { exact: true }).fill(adminPassword)
-  await page.getByLabel('Confirm password').fill(adminPassword)
-  await page.getByRole('button', { name: /finish|complete setup|create account/i }).click()
+  await page.getByLabel('Confirm password', { exact: true }).fill(adminPassword)
+  await page.getByRole('button', { name: /^continue$/i }).click()
+  await page.getByRole('button', { name: /finish setup/i }).click()
 }
 
 /** Sign in from the sign-in screen or the lock screen. */
