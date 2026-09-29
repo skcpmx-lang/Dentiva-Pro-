@@ -24,5 +24,10 @@
       "@renderer/*": ["src/renderer/src/*"]
     }
   },
-  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "src/shared/**/*.ts", "tests/unit/renderer/**/*.tsx"]
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "src/shared/**/*.ts",
+    "tests/unit/renderer/**/*.tsx"
+  ]
 }

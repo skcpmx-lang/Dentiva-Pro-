@@ -5,9 +5,9 @@
 
 ## Context
 
-Dentiva Pro requires a one-time activation code (`1516591935015165`) during setup. The code is a fixed
-offline secret; the application must not contain it as an obvious plaintext string in source, UI,
-configuration or documentation (REQ §57). It must be verified without any network call, and local
+Dentiva Pro requires a one-time activation code during setup. The code is a fixed offline secret
+supplied by the vendor to the clinic; the application must not contain it as an obvious plaintext
+string in source, UI, configuration or documentation (REQ §57), so this document never reproduces it. It must be verified without any network call, and local
 activation state must be tamper-evident.
 
 ## Decision
