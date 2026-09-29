@@ -174,12 +174,19 @@ export function setMeta(db: SqliteDatabase, key: string, value: string): void {
 
 /** Close the connection cleanly, truncating the WAL so the database file is self-contained. */
 export function closeDatabase(db: SqliteDatabase): void {
+  if (!db.open) return
   try {
-    if (db.open) {
-      db.pragma('wal_checkpoint(TRUNCATE)')
-      db.pragma('optimize')
-      db.close()
-    }
+    // Best effort: a read-only connection (for example the one that verifies a freshly written
+    // backup) cannot perform these, and a busy database may refuse either. Their failure must
+    // never prevent the close below — a connection that stays open keeps its file handle open,
+    // and on Windows that locks the database file against rename and delete.
+    db.pragma('wal_checkpoint(TRUNCATE)')
+    db.pragma('optimize')
+  } catch {
+    // The pragmas are maintenance; closing is not optional.
+  }
+  try {
+    db.close()
   } catch {
     // Closing must never throw during shutdown; the WAL is crash-safe by design.
   }

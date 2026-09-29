@@ -99,6 +99,55 @@ jobs:
           path: coverage/
           retention-days: 14
 
+  # The product ships for Windows, and the release workflow builds on windows-latest — the fast suites
+  # must therefore pass there too, not only on the ubuntu integration job. Failures are published as
+  # annotations because the runner log archive is not always reachable (see the e2e-windows job).
+  windows-tests:
+    name: Unit + integration tests on windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Require the activation code for the suite
+        shell: bash
+        env:
+          DENTIVA_ACTIVATION_CODE: ${{ secrets.DENTIVA_ACTIVATION_CODE }}
+        run: |
+          if [ -z "$DENTIVA_ACTIVATION_CODE" ]; then
+            echo "::error::This job needs the DENTIVA_ACTIVATION_CODE repository secret (Settings -> Secrets and variables -> Actions -> New repository secret). The activation verifier uses a fixed offline secret, so the suite cannot be faked; without the secret every activation-dependent test would be skipped and the result would prove nothing."
+            exit 1
+          fi
+
+      - name: Tests
+        id: tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          exit_code=0
+          npm run test:unit 2>&1 | tee tests-unit.txt || exit_code=1
+          npm run test:integration 2>&1 | tee tests-integration.txt || exit_code=1
+          if [ "$exit_code" -ne 0 ]; then
+            echo "A test suite failed; the reason is published as an annotation below."
+          fi
+          exit "$exit_code"
+
+      - name: Publish the test failure as an annotation
+        if: steps.tests.outcome == 'failure'
+        shell: bash
+        run: |
+          [ -s tests-unit.txt ] && node scripts/ci-annotate.mjs tests-unit.txt "Windows unit suite failed"
+          [ -s tests-integration.txt ] && node scripts/ci-annotate.mjs tests-integration.txt "Windows integration suite failed"
+          exit 1
+
   maintenance-tools:
     name: Maintenance tools (audit, notices, backup verifier, stress run)
     runs-on: ubuntu-latest

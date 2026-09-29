@@ -71,10 +71,27 @@ jobs:
             exit 1
           fi
 
+      # The suite is the first vitest run on windows-latest, so a failure must be diagnosable without
+      # the runner log archive (which is not always reachable): the output is teed to files and the
+      # failing part is published as an annotation, exactly like the e2e-windows CI job does.
       - name: Tests
+        id: tests
+        continue-on-error: true
         run: |
-          npm run test:unit
-          npm run test:integration
+          exit_code=0
+          npm run test:unit 2>&1 | tee tests-unit.txt || exit_code=1
+          npm run test:integration 2>&1 | tee tests-integration.txt || exit_code=1
+          if [ "$exit_code" -ne 0 ]; then
+            echo "A test suite failed; the reason is published as an annotation below."
+          fi
+          exit "$exit_code"
+
+      - name: Publish the test failure as an annotation
+        if: steps.tests.outcome == 'failure'
+        run: |
+          [ -s tests-unit.txt ] && node scripts/ci-annotate.mjs tests-unit.txt "Windows unit suite failed"
+          [ -s tests-integration.txt ] && node scripts/ci-annotate.mjs tests-integration.txt "Windows integration suite failed"
+          exit 1
 
       - name: Regenerate the third-party notices and fail when they are stale
         run: |

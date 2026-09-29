@@ -9,7 +9,7 @@ Status values: **Done** (implemented and verified by an executed test or a run),
 but a listed sub-item is missing), **Open** (not implemented yet). Nothing is marked Done because it
 compiles.
 
-Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
+Last reviewed: 2026-09-30 · branch `main` (session branch `arena/01a0ef61-dentiva-pro`)
 
 ---
 
@@ -79,7 +79,7 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 
 | # | Item | Status | Evidence / what is missing |
 |---|---|---|---|
-| 6.1 | Manual backup (manifest, checksums, config, attachments, README) | **Done** | `backup-audit.test.ts`; `scripts/verify-backup.mjs` verified a real backup and detected tampering |
+| 6.1 | Manual backup (manifest, checksums, config, attachments, README) | **Done** | `backup-audit.test.ts` (including "closes its verification connection so the backup database is not left locked" — the Windows EBUSY regression test); `scripts/verify-backup.mjs` verified a real backup and detected tampering |
 | 6.2 | Automatic backup schedule and retention | **Done** | `backup-audit.test.ts` |
 | 6.3 | Restore with pre-restore backup, verification and rollback | **Done** | `backup-audit.test.ts` |
 | 6.4 | Data export / destructive data management | **Done** | `admin.test.ts` (CSV/JSON export, permission refusal), `reports.test.ts` (report CSV), `operations.test.ts` (typed phrase + password + verified pre-action backup, full reset that keeps the audit trail, CSV patient import with dry run, duplicates, per-row errors and refusals) |
@@ -106,8 +106,8 @@ Last reviewed: 2026-09-29 · branch `arena/01a0ee4f-dentiva-pro`
 | 8.3 | End-to-end acceptance suite | **Pending (written)** | `tests/e2e/*` runs on windows-latest; the job is gated on the `DENTIVA_ACTIVATION_CODE` secret, so it has not executed yet |
 | 8.4 | Stress dataset and measured performance | **Done** | `scripts/seed-stress-data.mjs`, `docs/testing/PERFORMANCE_MEASUREMENTS.md` |
 | 8.5 | Dependency and licence audit + notices | **Done** | `npm run audit:deps`, `npm run licenses`; CI checks freshness |
-| 8.6 | CI pipeline (lint, types, tests, build, tools, E2E) | **Partial** | `.github/workflows/ci.yml` runs on GitHub: the lint/types/unit/build job and the maintenance-tools job are green. The integration and E2E jobs fail on purpose until the `DENTIVA_ACTIVATION_CODE` repository secret is added |
-| 8.7 | Windows installer build | **Pending** | `release.yml` + `npm run verify:installer`; requires windows-latest |
+| 8.6 | CI pipeline (lint, types, tests, build, tools, E2E) | **Partial** | `.github/workflows/ci.yml` runs on GitHub: the lint/types/unit/build and maintenance-tools jobs are green, and the `integration` job runs the whole suite with the (now configured) `DENTIVA_ACTIVATION_CODE` secret. A `windows-tests` job runs the unit + integration suites on windows-latest on every push (added after the release run's first Windows failure). Failures of the Windows jobs are published as annotations via `scripts/ci-annotate.mjs` because the runner log archive is unreachable from this environment |
+| 8.7 | Windows installer build | **Pending** | `release.yml` + `npm run verify:installer`; requires windows-latest. The release job's "Tests" step failed in run 36639642068 (12 EBUSY errors from the `closeDatabase` handle leak — fixed and regression-tested); the tag is re-pointed to the fix and the next tag-triggered run must be green end to end |
 | 8.8 | Clean-machine install / uninstall / data-preservation test | **Pending** | Checklist in `docs/release/` to be completed with evidence |
 | 8.9 | Release readiness document | **Done** | `docs/release/RELEASE_READINESS.md` — verdict, gate table, pending Windows evidence, and the documented deviations (mobile out of scope, activation limitation, DPI/uninstall evidence outstanding) |
 | 8.10 | 14 pre-release audits (master §113) | **Done** | `npm run audit:prerelease` (12 pass, the two Windows-only audits report a reasoned skip), wired into the CI maintenance job and the release workflow; the requirements traceability matrix is regenerated and freshness-checked |

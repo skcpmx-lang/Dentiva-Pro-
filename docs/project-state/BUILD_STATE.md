@@ -8,8 +8,8 @@
 
 ```yaml
 project: Dentiva Pro
-current_phase: 5 - Verification and delivery (feature surface implemented; acceptance evidence, audits and release documents being completed)
-branch: arena/01a0ee4f-dentiva-pro
+current_phase: 5 - Verification and delivery (release pipeline fixed; the first windows-latest run of the fast suites exposed and fixed a real handle-leak defect; awaiting the green tag-triggered release run)
+branch: arena/01a0ef61-dentiva-pro (session branch; merged into main via PR)
 last_updated: 2026-09-30
 ```
 
@@ -30,15 +30,15 @@ last_updated: 2026-09-30
 | End-to-end (Electron) suites | **Written, first run pending on windows-latest** |
 | Performance measurement (NFR-003) | **Measured** — `docs/testing/PERFORMANCE_MEASUREMENTS.md` |
 | Dependency/licence audit + third-party notices | **Complete** (`npm run audit:deps`, `npm run licenses`) |
-| GitHub Actions CI + release pipeline | **Running** — quality, maintenance and integration jobs are green on GitHub since the `DENTIVA_ACTIVATION_CODE` secret was configured (the integration job now runs all 110 integration tests for real). The Windows end-to-end job executes the suite and is being diagnosed through annotations |
-| Windows installer build, clean-machine test | **Pending** (windows-latest) |
-| Release (GitHub Release or `dist/`) | **Pending** |
+| GitHub Actions CI + release pipeline | **Running** — quality, maintenance and integration jobs are green on GitHub since the `DENTIVA_ACTIVATION_CODE` secret was configured (the integration job now runs all 110 integration tests for real). The Windows end-to-end job executes the suite and is being diagnosed through annotations. Since the v1.0.0 tag run: a `windows-tests` CI job runs the unit + integration suites on windows-latest on every push, and both the release job and that CI job publish test failures as job annotations (the runner log archive is not reachable from this environment) |
+| Windows installer build, clean-machine test | **Pending** (windows-latest) — the release job now gets past `npm ci`/lint/typecheck/secret gate; its first real test run (run 36639642068) exposed the `closeDatabase` handle-leak defect, which is fixed with a regression test; the tag is re-pointed to the fix commit to trigger the next run |
+| Release (GitHub Release or `dist/`) | **Pending — must remain a DRAFT** until every release gate below is verified; no release has been created yet (both release runs failed before the publish step) |
 
 ## Machine-readable task state
 
 ```yaml
-current_task: Operations coverage finished (destructive safeguards, full reset, patient date filters, notifications, setup validation, CSV patient import with dry run) and the two production defects it exposed are fixed; the operations and import suites are green locally
-next_task: Build and verify the real installer with the Release workflow on windows-latest (the DENTIVA_ACTIVATION_CODE repository secret must exist first), then record the executed evidence in docs/release/RELEASE_READINESS.md
+current_task: Release pipeline repair. The v1.0.0 tag release run 36639642068 failed at the Tests step on windows-latest — the first run of the unit + integration suites on Windows. Diagnostic run 36643028902 (tag re-pointed to the instrumented branch commit) published the failure as annotations: 12 EBUSY "resource busy or locked, unlink ...Backups...dentiva.db" teardown errors, exactly the 12 tests that call createBackup. Root cause reproduced locally with an /proc/self/fd probe: closeDatabase() runs wal_checkpoint + optimize + close() in ONE try/catch; on a real clinic database PRAGMA optimize throws "attempt to write a readonly database" on the read-only backup-verification connection, so the catch swallowed it and db.close() never ran — leaking the file handle. POSIX never notices (unlink works on open files); Windows locks the file, so every dispose() rmSync of a test data root containing a backup fails with EBUSY. Fixed by making the two maintenance pragmas best-effort and closing unconditionally (src/main/db/connection.ts), plus a cross-platform regression test (backup-audit.test.ts: /proc fd probe on Linux, rename round-trip on Windows) and maxRetries on the harness teardown.
+next_task: Push the fix, watch the branch CI (the new windows-tests job is the platform proof), merge to main, re-point v1.0.0 at the merged commit and push the tag, then verify the release run is green: installer + SHA256SUMS.txt + build-info.json uploaded, verify:installer passed, GitHub Release v1.0.0 exists as a DRAFT. Download and hash-verify the three artifacts. Do NOT publish the release. Then record the executed evidence in docs/release/RELEASE_READINESS.md and continue the remaining Windows evidence items.
 completed:
   - docs/* (requirements, architecture, ADRs, database, security, ux, printing, backup-restore, testing, compliance, project-state, user guide)
   - src/shared/** (money incl. fromDecimalString, date, ids, dental, csv, permissions, validation, constants, printing models)
@@ -66,7 +66,7 @@ known_issues:
   - Empty folders kept out of git (for example an empty attachments directory) must be created by the code at runtime; do not re-add committed placeholder files.
 pending_fixes: []
 last_successful_build: green (electron-vite build, out/renderer ~1.45 MB js + 49 kB css; GitHub Actions quality job green)
-last_successful_test: 248 passing locally (138 unit + 110 integration) with DENTIVA_ACTIVATION_CODE set; without it the activation-dependent integration suites report as skipped by design (143 passed / 105 skipped). GitHub CI: lint/types/build/unit, maintenance and integration jobs green; the Windows e2e job runs the Electron suite and its failures are published as annotations.
+last_successful_test: 249 passing locally (138 unit + 111 integration) with the activation verifier exercised through a synthetic code (the local-only substitute for the CI secret; the one test that verifies the SHIPPED verifier against the real code is the only local exception and passes in CI where the secret holds the real code). Without any code the activation-dependent suites report as skipped by design. GitHub CI: lint/types/build/unit, maintenance and integration jobs green; the new windows-tests job (unit + integration on windows-latest) is the platform parity gate; the Windows e2e job runs the Electron suite and its failures are published as annotations.
 ```
 
 ## Corrections found by auditing the repository (2026-09-30, keep them fixed)
@@ -130,6 +130,17 @@ last_successful_test: 248 passing locally (138 unit + 110 integration) with DENT
 12. **The traceability freshness check was date-dependent.** The generator stamped the file with the current
    date and CI compared it byte for byte, so the check would have failed on the next day even with an
    unchanged repository. The timestamp is gone; `npm run docs:traceability -- --check` is now stable.
+13. **Every backup leaked a read-only database connection (Windows file-lock defect).**
+   `closeDatabase()` ran `wal_checkpoint(TRUNCATE)`, `optimize` and `close()` inside one try/catch. On a
+   real clinic database `PRAGMA optimize` throws `attempt to write a readonly database` on the
+   read-only connection `createBackup` uses to verify the file it just wrote, the catch swallowed the
+   error and `db.close()` never ran. The leaked handle is invisible on POSIX (unlink works on open
+   files) but on Windows it locks the backup's `dentiva.db`, so the backup prune, restore staging and
+   every test-teardown delete fail with EBUSY. This was the failure of the release run 36639642068
+   (12 of the 12 tests that create a backup). `closeDatabase` now treats the two maintenance pragmas as
+   best-effort and always closes; `backup-audit.test.ts` proves the backup file is left unlocked
+   (/proc fd probe on Linux, rename round-trip on Windows), and the integration harness teardown
+   retries like the e2e harness does.
 
 ## Corrections found by running the app (2026-09-30, keep them fixed)
 
@@ -174,7 +185,20 @@ had caught. All four are fixed, with integration coverage:
   `e2e-windows` and Release jobs fail on purpose with an explanatory message instead of reporting a green
   build in which the activation-dependent tests (and every Electron acceptance test) were skipped. The
   installer artifact and the Windows evidence cannot be produced without it; the automated token used here
-  can read and write the repository but cannot write secrets.
+  can read and write the repository but cannot write secrets. The secret is configured (the release job's
+  secret gate passes), so the suites run for real on GitHub.
+* **GitHub access limits observed from this environment (2026-09-30, keep them in mind):**
+  * The runner **log archive is unreachable** (the `results-receiver.actions.githubusercontent.com` redirect
+    of `GET /actions/runs/{id}/logs` fails with an SSL error; `gh run view --log-failed` fails the same
+    way). Failing steps must therefore publish their reason as **job annotations** — the pattern already in
+    `scripts/ci-annotate.mjs`, now used by the release job and the `windows-tests` CI job.
+  * Annotations are readable per check run: `gh api /repos/{owner}/{repo}/check-runs/{job_databaseId}/annotations`.
+    The run-level endpoint `.../actions/runs/{run_id}/annotations` returns 404 for this token.
+  * `gh workflow run` (workflow_dispatch) is **forbidden for the app token** (403
+    "Resource not accessible by integration"), so the Release workflow is triggered by **pushing the tag**
+    (it also runs on `push: tags: v*`). To re-run the release, force-move `v1.0.0` to the new commit and
+    push the tag (`git tag -f v1.0.0 <sha> && git push -f origin v1.0.0`); the tag must always point at a
+    commit whose `package.json` version matches the tag name.
 
 ## How to resume in 5 steps
 

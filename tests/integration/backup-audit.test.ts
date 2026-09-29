@@ -6,7 +6,7 @@
  * restore always keeps a way back, and tampered backups are rejected before the live database is touched.
  */
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, readlinkSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { completeSetup, createHarness, patientInput, type Harness } from './harness'
@@ -135,6 +135,36 @@ suite('backups', () => {
     expect(inspection.problems).toEqual([])
     expect(inspection.schemaCompatible).toBe(true)
     expect(inspection.fileCount).toBeGreaterThan(0)
+  })
+
+  it('closes its verification connection so the backup database is not left locked', async () => {
+    const record = await harness.services.admin.createBackup('manual', { includeAttachments: false })
+    const databaseFile = join(record.path, 'Database', 'dentiva.db')
+
+    // A handle left open on the backup file is harmless on POSIX (unlink works anyway) but on
+    // Windows it locks the file: the backup prune, the restore staging copy and every teardown
+    // delete fail with EBUSY. Two platform-specific probes catch the same bug:
+    //  * on Linux an open file descriptor is visible in /proc/self/fd;
+    //  * on Windows a locked file cannot be renamed.
+    if (process.platform === 'linux') {
+      const open = readdirSync('/proc/self/fd').filter((fd) => {
+        try {
+          return readlinkSync(`/proc/self/fd/${fd}`) === databaseFile
+        } catch {
+          return false
+        }
+      })
+      expect(open, `the backup database is still open through descriptor(s) ${open.join(', ')}`).toEqual([])
+    }
+    const moved = `${databaseFile}.locked-check`
+    renameSync(databaseFile, moved)
+    try {
+      expect(existsSync(moved)).toBe(true)
+    } finally {
+      renameSync(moved, databaseFile)
+    }
+    // The move round-trips without touching the bytes: the checksum in the manifest still holds.
+    expect(harness.services.admin.verifyBackup(record.path).valid).toBe(true)
   })
 
   it('lists backups newest first and keeps them in the backup folder', async () => {
