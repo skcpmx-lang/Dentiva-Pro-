@@ -69,6 +69,24 @@ export function isBuiltin(specifier) {
   return BUILTINS.has(name.split('/')[0])
 }
 
+/**
+ * Alias prefixes the build resolves inside the repository (`@shared/*`, `@branding/*`, …). They are read
+ * from the tsconfig `paths` blocks instead of being hard-coded, so adding an alias cannot make this audit
+ * mistake it for an npm package.
+ */
+export function projectAliasPrefixes(repoRoot) {
+  const prefixes = new Set(['@shared/', '@main/'])
+  for (const file of ['tsconfig.node.json', 'tsconfig.web.json', 'tsconfig.json']) {
+    const path = join(repoRoot, file)
+    if (!existsSync(path)) continue
+    const text = readFileSync(path, 'utf8')
+    for (const match of text.matchAll(/"(@[A-Za-z0-9._-]+)\/\*"\s*:/g)) {
+      prefixes.add(`${match[1]}/`)
+    }
+  }
+  return prefixes
+}
+
 function walkSource(directory, files = []) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
@@ -81,6 +99,7 @@ function walkSource(directory, files = []) {
 /** Package names imported directly by the application source under `src/`. */
 export function importedPackages(repoRoot, directories = ['src']) {
   const names = new Set()
+  const aliases = [...projectAliasPrefixes(repoRoot)]
   const patterns = [
     /import\s+[^'"]*from\s*['"]([^'"]+)['"]/g,
     /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
@@ -97,8 +116,9 @@ export function importedPackages(repoRoot, directories = ['src']) {
         let match = pattern.exec(contents)
         while (match) {
           const name = packageNameOf(match[1])
-          // Project-internal aliases are not third-party packages.
-          if (name && !isBuiltin(match[1]) && !name.startsWith('@shared/') && !name.startsWith('@main/')) {
+          const isProjectAlias = aliases.some((prefix) => match[1].startsWith(prefix))
+          // Project-internal aliases (and the assets they point at) are not third-party packages.
+          if (name && !isBuiltin(match[1]) && !isProjectAlias) {
             names.add(name)
           }
           match = pattern.exec(contents)
