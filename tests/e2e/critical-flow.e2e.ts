@@ -153,7 +153,11 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
     await page.getByLabel('Date of birth', { exact: true }).fill('1992-04-11')
     await page.getByLabel('Phone', { exact: true }).fill('+8801811111111')
     await page.getByLabel('City').fill('Tangail')
-    await page.getByRole('button', { name: /register patient/i }).click()
+    // Two buttons carry this label: the empty-state card behind the dialog and the dialog's own submit.
+    await page
+      .getByRole('dialog', { name: 'Register a new patient' })
+      .getByRole('button', { name: 'Register patient' })
+      .click()
 
     // The register lists the new patient, newest first, with its generated code.
     await expect(page.getByText('E2E Flow Patient').first()).toBeVisible({ timeout: 20_000 })

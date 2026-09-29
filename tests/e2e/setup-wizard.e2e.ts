@@ -115,7 +115,10 @@ test.describe('Setup wizard and application shell', () => {
       .getByRole('button', { name: /sign in/i })
       .first()
       .click()
-    await expect(page.getByText(/incorrect|not valid|failed|wrong/i).first()).toBeVisible({ timeout: 15_000 })
+    // The service refuses the sign-in and the screen shows the reason in its alert region.
+    const refusal = page.getByRole('alert').first()
+    await expect(refusal).toBeVisible({ timeout: 15_000 })
+    await expect(refusal).toContainText(/not correct|incorrect|not valid|wrong/i)
 
     await signInThroughUi(page)
     await waitForShell(page)
