@@ -23,7 +23,7 @@ import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 
 import { APP_INFO } from '@shared/constants'
-import type { AppEvent, IpcPayload, LogBundle, RuntimeInfo } from '@shared/ipc'
+import type { AppEvent, LogBundle, RuntimeInfo } from '@shared/ipc'
 import type { JobProgress, PrinterInfo } from '@shared/types'
 import { nowSql } from '@shared/date'
 import { verifyActivationCode, activationStateHash, createInstallId } from './security/activation'
@@ -32,6 +32,7 @@ import { closeDatabase, openDatabase, type SqliteDatabase } from './db/connectio
 import { Logger, setGlobalLogger } from './logging/logger'
 import { SessionManager } from './security/session'
 import { PrintHost } from './printing/print-host'
+import { buildPrintDocument } from './printing/build-document'
 import { applyInitialDefaults, createServices, type Services } from './services/container'
 import {
   countThirdPartyComponents,
@@ -258,20 +259,6 @@ function requireServices(): Services {
   return services
 }
 
-function buildPrintDocument(payload: IpcPayload<'print.build'>) {
-  const current = requireServices()
-  if (payload.documentType === 'prescription') {
-    return current.admin.buildPrescriptionDocumentPrint(payload.entityId, payload.paper)
-  }
-  if (payload.documentType === 'invoice') {
-    return current.admin.buildInvoiceDocumentPrint(payload.entityId, payload.paper)
-  }
-  if (!payload.reportRequest) {
-    throw new Error('Printing a report needs the report definition.')
-  }
-  return current.admin.buildReportPrint(payload.reportRequest)
-}
-
 /**
  * Locate a file that ships as an `extraResource`.
  *
@@ -309,10 +296,10 @@ function createHost(): RegistryHost {
         }
       })
     },
-    buildDocument: (payload) => buildPrintDocument(payload),
+    buildDocument: (payload) => buildPrintDocument(requireServices(), payload),
     print: async (payload) => {
       const current = requireServices()
-      const document = buildPrintDocument({
+      const document = buildPrintDocument(current, {
         documentType: payload.documentType,
         entityId: payload.entityId,
         reportRequest: payload.reportRequest
