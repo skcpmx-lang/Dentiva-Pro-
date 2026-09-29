@@ -177,6 +177,27 @@ describe('system roles', () => {
   })
 })
 
+describe('export permissions', () => {
+  it('gives every role that may export a dataset the export module gate as well', () => {
+    // export.data is gated on data.export at the router and narrowed per entity in the service, so a role
+    // that may export one dataset must hold both codes; otherwise the screen's export button (gated on the
+    // entity permission) would be refused one layer further down.
+    const entityExports = [
+      'audit.export',
+      'patients.export',
+      'reports.financial.export',
+      'accounting.export',
+      'inventory.export'
+    ] as const
+    const offenders = SYSTEM_ROLES.filter(
+      (role) =>
+        role.permissions.some((code) => (entityExports as readonly string[]).includes(code)) &&
+        !role.permissions.includes('data.export')
+    ).map((role) => role.code)
+    expect(offenders).toEqual([])
+  })
+})
+
 describe('effective permissions', () => {
   const role = SYSTEM_ROLES.find((entry) => entry.code === 'receptionist')?.permissions ?? []
 

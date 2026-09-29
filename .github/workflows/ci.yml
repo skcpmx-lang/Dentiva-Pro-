@@ -168,7 +168,19 @@ jobs:
         run: npm run build:app
 
       - name: End-to-end acceptance tests
-        run: npm run test:e2e
+        id: e2e
+        continue-on-error: true
+        shell: bash
+        run: npm run test:e2e 2>&1 | tee e2e-output.txt
+
+      # A Windows job that fails is only useful if the reason survives: the runner log archive is not always
+      # reachable, so the tail of the output is published as an annotation, which is part of the REST API.
+      - name: Publish the end-to-end failure as an annotation
+        if: steps.e2e.outcome == 'failure'
+        shell: bash
+        run: |
+          node scripts/ci-annotate.mjs e2e-output.txt "End-to-end suite failed"
+          exit 1
 
       - name: Upload Playwright results
         if: always()
