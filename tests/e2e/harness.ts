@@ -42,6 +42,11 @@ export interface LaunchOptions {
   env?: Record<string, string>
   /** Keep the application data after the test (for debugging). */
   keepData?: boolean
+  /**
+   * Launch this built Electron executable (the installed application) instead of the development
+   * bundle in out/main. The data root and environment isolation below still apply.
+   */
+  executablePath?: string
 }
 
 function temporaryRoot(prefix: string): string {
@@ -53,21 +58,22 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
   const dataRoot = join(appDataDir, 'Data')
   mkdirSync(dataRoot, { recursive: true })
 
-  const app = await electron.launch({
-    args: [mainBundle],
-    env: {
-      ...process.env,
-      // The explicit override is what actually isolates the run (see the note at the top); APPDATA and
-      // LOCALAPPDATA are redirected as well so window state and caches land in the throwaway folder too.
-      DENTIVA_DATA_ROOT: dataRoot,
-      APPDATA: appDataDir,
-      LOCALAPPDATA: appDataDir,
-      // No update checks, no dev server: the test drives the built bundles.
-      DENTIVA_DEV_SERVER_URL: '',
-      DENTIVA_E2E: '1',
-      ...options.env
-    }
-  })
+  const launchEnvironment = {
+    ...process.env,
+    // The explicit override is what actually isolates the run (see the note at the top); APPDATA and
+    // LOCALAPPDATA are redirected as well so window state and caches land in the throwaway folder too.
+    DENTIVA_DATA_ROOT: dataRoot,
+    APPDATA: appDataDir,
+    LOCALAPPDATA: appDataDir,
+    // No update checks, no dev server: the test drives the built bundles.
+    DENTIVA_DEV_SERVER_URL: '',
+    DENTIVA_E2E: '1',
+    ...options.env
+  }
+  const app = options.executablePath
+    // The installed application: the executable itself is the entry point (main comes from app.asar).
+    ? await electron.launch({ executablePath: options.executablePath, env: launchEnvironment })
+    : await electron.launch({ args: [mainBundle], env: launchEnvironment })
 
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')

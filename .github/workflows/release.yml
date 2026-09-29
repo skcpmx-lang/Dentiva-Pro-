@@ -99,9 +99,19 @@ jobs:
           git diff --exit-code docs/compliance/
 
       - name: Pre-release audits (master prompt §113) and tracing check
+        id: audits
+        continue-on-error: true
         run: |
-          node scripts/generate-traceability-matrix.mjs --check
-          npm run audit:prerelease -- --report pre-release-audit.md
+          exit_code=0
+          node scripts/generate-traceability-matrix.mjs --check 2>&1 | tee -a audits-output.txt || exit_code=1
+          npm run audit:prerelease -- --report pre-release-audit.md 2>&1 | tee -a audits-output.txt || exit_code=1
+          exit "$exit_code"
+
+      - name: Publish the audit failure as an annotation
+        if: steps.audits.outcome == 'failure'
+        run: |
+          node scripts/ci-annotate.mjs audits-output.txt "Pre-release audits failed"
+          exit 1
 
       - name: Build and package the NSIS installer
         run: npm run package:win
@@ -122,6 +132,21 @@ jobs:
             release/SHA256SUMS.txt
             release/build-info.json
           retention-days: 90
+
+      # The runner is a fresh machine: install the just-built installer the way a clinic would (no
+      # administrator rights), run first launch + activation + the setup wizard + real writes through
+      # the installed executable, uninstall silently, and prove the clinic data survives. The regular
+      # CI job never builds the installer, so this evidence is only produced here.
+      - name: Clean-machine install, first launch and uninstall
+        id: installer-e2e
+        continue-on-error: true
+        run: npm run test:e2e:installer 2>&1 | tee installer-e2e-output.txt
+
+      - name: Publish the installer test failure as an annotation
+        if: steps.installer-e2e.outcome == 'failure'
+        run: |
+          node scripts/ci-annotate.mjs installer-e2e-output.txt "Clean-machine installer test failed" test-results/e2e-results.json
+          exit 1
 
       - name: Publish the GitHub release
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
