@@ -17,8 +17,9 @@ asarUnpack:
   - node_modules/better-sqlite3/**
 
 extraResources:
-  # The user guide, the licence notices and the branding that the About page links to. Fonts are bundled
-  # by the renderer build (Vite inlines the @fontsource files), so no font folder is copied here.
+  # The user guide and the licence notices that the About page opens. The application icon lives in the
+  # executable (build/icon.*) and the in-app brand mark is bundled by the renderer build, so neither is
+  # copied here.
   - from: docs/user-guide
     to: user-guide
     filter: ['USER_GUIDE.html']

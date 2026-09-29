@@ -106,11 +106,8 @@ if (existsSync(installerPath)) {
   const checksum = sha256(installerPath)
   const checksumFile = join(releaseDir, 'SHA256SUMS.txt')
   const lines = [`${checksum}  ${basename(installerPath)}`]
-  const unpacked = join(releaseDir, 'win-unpacked')
-  if (existsSync(unpacked)) {
-    for (const name of entries.filter((entry) => /\.(blockmap|yml)$/.test(entry))) {
-      lines.push(`${sha256(join(releaseDir, name))}  ${name}`)
-    }
+  for (const name of entries.filter((entry) => /\.(blockmap|yml)$/.test(entry))) {
+    lines.push(`${sha256(join(releaseDir, name))}  ${name}`)
   }
   writeFileSync(checksumFile, `${lines.join('\n')}\n`, 'utf8')
   check('Checksums written', true, checksumFile)
@@ -143,9 +140,15 @@ if (existsSync(installerPath)) {
 }
 
 const unpacked = join(releaseDir, 'win-unpacked')
-if (existsSync(unpacked)) {
-  check('Unpacked application', existsSync(join(unpacked, 'Dentiva Pro.exe')), 'Dentiva Pro.exe is present')
+const unpackedPresent = existsSync(unpacked)
+check(
+  'Unpacked application',
+  unpackedPresent,
+  unpackedPresent ? unpacked : 'win-unpacked is missing (run "npm run package:dir" to inspect it)'
+)
+if (unpackedPresent) {
   const resources = join(unpacked, 'resources')
+  check('Application executable', existsSync(join(unpacked, 'Dentiva Pro.exe')), 'Dentiva Pro.exe is present')
   check('app.asar', existsSync(join(resources, 'app.asar')), 'the bundled application archive is present')
   check(
     'better-sqlite3 unpacked',
@@ -153,17 +156,20 @@ if (existsSync(unpacked)) {
     'the native SQLite module must stay outside the archive'
   )
   check(
-    'Branding resources',
-    existsSync(join(resources, 'branding')),
-    'assets/branding was copied into the package'
+    'Licence notices shipped',
+    existsSync(join(resources, 'legal', 'THIRD-PARTY-NOTICES.txt')),
+    'docs/compliance/THIRD-PARTY-NOTICES.txt was copied to resources/legal'
   )
-  check('Font resources', existsSync(join(resources, 'fonts')), 'assets/fonts was copied into the package')
-} else {
-  checks.push({
-    name: 'Unpacked application',
-    ok: false,
-    detail: 'win-unpacked is missing (run "npm run package:dir" to inspect)'
-  })
+  check(
+    'User guide shipped',
+    existsSync(join(resources, 'user-guide', 'USER_GUIDE.html')),
+    'docs/user-guide/USER_GUIDE.html was copied to resources/user-guide'
+  )
+  check(
+    'No stray font or icon folders',
+    !existsSync(join(resources, 'fonts')) && !existsSync(join(resources, 'icons')),
+    'fonts are bundled by the renderer and the app icon lives in the executable, so neither folder is shipped'
+  )
 }
 
 function report() {
