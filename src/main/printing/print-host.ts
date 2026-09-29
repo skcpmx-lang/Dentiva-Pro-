@@ -105,7 +105,30 @@ export class PrintHost {
     const jobId = this.register(document)
 
     if (mode === 'preview') {
-      return { ok: true, mode, filePath: null, pages: null, message: 'Preview ready.' }
+      // A real preview window showing the exact sheet that will print (same route, same component).
+      // The document stays registered until the window is closed so `print.ready` can serve it.
+      const preview = this.createWindow(document, true)
+      preview.on('closed', () => {
+        this.documents.delete(jobId)
+        this.waiters.delete(jobId)
+      })
+      try {
+        await this.loadPrintView(preview, jobId, document)
+        return { ok: true, mode, filePath: null, pages: null, message: 'Preview opened.' }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.options.logger.error(`Print preview failed: ${message}`)
+        this.documents.delete(jobId)
+        this.waiters.delete(jobId)
+        if (!preview.isDestroyed()) preview.destroy()
+        return {
+          ok: false,
+          mode,
+          filePath: null,
+          pages: null,
+          message: `The preview could not be opened: ${message}`
+        }
+      }
     }
 
     const showWindow = mode === 'print' && !request.printerName

@@ -65,9 +65,9 @@ import type {
   SettingsRepository,
   StaffRepository
 } from '../db/repositories-core'
+import { AuditRepository } from '../db/repositories-clinical'
 import type {
   AttachmentRepository,
-  AuditRepository,
   PatientRepository,
   PrescriptionRepository
 } from '../db/repositories-clinical'
@@ -138,7 +138,30 @@ export class AdminService {
       severity?: 'info' | 'warning' | 'critical'
     } = {}
   ): void {
-    this.deps.audit.append({
+    this.auditOn(this.deps.db, action, summary, options)
+  }
+
+  /**
+   * Write an audit entry through one specific connection.
+   *
+   * A restore closes the connection the container was built with and swaps the database file, so the
+   * entries written after the swap must go through the connection that was just re-opened — otherwise
+   * the service would try to log a successful restore on a closed database and the whole operation
+   * would appear to have failed.
+   */
+  private auditOn(
+    db: SqliteDatabase,
+    action: string,
+    summary: string,
+    options: {
+      entityType?: string | null
+      entityId?: string | number | null
+      before?: unknown
+      after?: unknown
+      severity?: 'info' | 'warning' | 'critical'
+    } = {}
+  ): void {
+    new AuditRepository(db).append({
       actorUserId: this.deps.session.userId,
       actorUsername: this.deps.session.username,
       action,
@@ -869,7 +892,12 @@ export class AdminService {
     const includeAttachments = options.includeAttachments ?? true
     const settings = this.deps.settings.get()
     const stamp = nowSql().replace(/[: ]/g, '-')
-    const folderName = `DentivaPro_Backup_${stamp}`
+    // The timestamp has second resolution, so two backups started in the same second must not share a
+    // folder: the second one would silently overwrite the first.
+    let folderName = `DentivaPro_Backup_${stamp}`
+    for (let attempt = 2; existsSync(join(this.backupRoot(), folderName)); attempt += 1) {
+      folderName = `DentivaPro_Backup_${stamp}_${attempt}`
+    }
     const folderPath = join(this.backupRoot(), folderName)
     mkdirSync(folderPath, { recursive: true })
 
@@ -904,6 +932,7 @@ export class AdminService {
     }
 
     this.progress('backup', 'config', 'Writing the configuration snapshot…', 1, includeAttachments ? 3 : 2)
+    mkdirSync(join(folderPath, 'Config'), { recursive: true })
     const clinic = this.deps.clinic.get()
     writeFileSync(
       join(folderPath, 'Config', 'clinic-config.json'),
@@ -1248,10 +1277,13 @@ export class AdminService {
     const settings = this.deps.settings.get()
     if (!settings.autoBackupEnabled) return null
 
-    const [hour, minute] = (settings.autoBackupTime || '21:00').split(':').map(Number)
+    const [rawHour, rawMinute] = (settings.autoBackupTime || '21:00').split(':').map(Number)
+    // 00:00 is a valid time, so the fallback must only apply to values that are missing or out of range.
+    const hour = Number.isInteger(rawHour) && rawHour >= 0 && rawHour <= 23 ? rawHour : 21
+    const minute = Number.isInteger(rawMinute) && rawMinute >= 0 && rawMinute <= 59 ? rawMinute : 0
     const now = new Date()
     const todayTarget = new Date()
-    todayTarget.setHours(hour || 21, minute || 0, 0, 0)
+    todayTarget.setHours(hour, minute, 0, 0)
 
     const last = this.backups().find((entry) => entry.trigger === 'auto' && entry.status !== 'failed')
     if (last) {
@@ -1358,8 +1390,9 @@ export class AdminService {
     this.progress('restore', 'verify', 'Verifying the restored clinic data…', 3, 5)
     let verified: boolean
     let verificationMessage: string
+    let live = this.deps.reopenDb()
     try {
-      const db = this.deps.reopenDb()
+      const db = live
       const integrity = db.pragma('integrity_check') as { integrity_check: string }[]
       const foreignKeys = db.pragma('foreign_key_check') as unknown[]
       verified = (integrity[0]?.integrity_check ?? '') === 'ok' && foreignKeys.length === 0
@@ -1376,8 +1409,9 @@ export class AdminService {
       this.deps.closeDb()
       rmSync(liveDatabase, { force: true })
       renameSync(join(rollbackDir, 'dentiva.db'), liveDatabase)
-      this.deps.reopenDb()
-      this.audit(
+      live = this.deps.reopenDb()
+      this.auditOn(
+        live,
         'backup.restore_failed',
         `Restore of ${basename(request.folderPath)} failed and was rolled back: ${verificationMessage}`,
         {
@@ -1404,7 +1438,7 @@ export class AdminService {
     }
 
     rmSync(stagingDir, { recursive: true, force: true })
-    this.audit('backup.restore', `Restored the clinic data from ${basename(request.folderPath)}`, {
+    this.auditOn(live, 'backup.restore', `Restored the clinic data from ${basename(request.folderPath)}`, {
       entityType: 'backup',
       entityId: preRestoreBackup.id,
       after: { folder: request.folderPath, verification: verificationMessage },

@@ -182,6 +182,20 @@ export class ClinicalService {
     })
   }
 
+  /** Restore an archived patient (the record and all history were kept). */
+  restorePatient(id: number): Patient {
+    this.require('patients.delete')
+    const existing = this.deps.patients.findById(id)
+    if (!existing) throw notFound('Patient', id)
+    this.deps.patients.restore(id, this.deps.session.username ?? 'system')
+    this.audit('patients.restore', `Restored archived patient ${existing.code} (${existing.fullName})`, {
+      entityType: 'patient',
+      entityId: id,
+      severity: 'critical'
+    })
+    return this.deps.patients.findById(id) as Patient
+  }
+
   getPatientProfile(id: number): PatientProfile {
     this.require('patients.view')
     const patient = this.deps.patients.findById(id)

@@ -1309,18 +1309,26 @@ export class BillingService {
     }[]
   }
 
-  /** Outstanding balance for one patient (used by the invoice form). */
+  /**
+   * Net ledger position of one patient (shown by the invoice form while billing).
+   *
+   * Everything invoiced that was not voided, minus every payment received, including advances and
+   * part-payments that are not linked to an invoice. The result matches `PatientFinancialSummary`
+   * so the profile and the invoice form can never disagree: positive is money owed to the clinic,
+   * negative is an advance the clinic is holding for the patient.
+   */
   patientBalance(patientId: number): number {
     this.require('invoices.view')
-    return Number(
-      (
-        this.deps.db
-          .prepare(
-            `SELECT COALESCE(SUM(balance_poisha), 0) AS value FROM invoices WHERE patient_id = ? AND status <> 'void'`
-          )
-          .get(patientId) as { value: number }
-      ).value
-    )
+    const row = this.deps.db
+      .prepare(
+        `SELECT
+           (SELECT COALESCE(SUM(total_poisha), 0) FROM invoices
+             WHERE patient_id = @id AND status <> 'void')
+           - (SELECT COALESCE(SUM(CASE WHEN kind = 'refund' THEN -amount_poisha ELSE amount_poisha END), 0)
+                FROM payments WHERE patient_id = @id AND voided_at IS NULL) AS value`
+      )
+      .get({ id: patientId }) as { value: number }
+    return Number(row.value)
   }
 }
 

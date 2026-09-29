@@ -62,6 +62,7 @@ import {
   openPathSchema,
   outstandingSchema,
   patientArchiveSchema,
+  patientRestoreSchema,
   patientListSchema,
   patientLookupSchema,
   patientInputSchema,
@@ -349,6 +350,15 @@ export function createRegistry(): Registry {
       audit: 'patient.archive',
       handler: (ctx, payload) => {
         ctx.services.clinical.archivePatient(payload.id)
+        return { ok: true as const }
+      }
+    },
+    'patients.restore': {
+      permission: 'patients.delete',
+      schema: patientRestoreSchema,
+      audit: 'patient.restore',
+      handler: (ctx, payload) => {
+        ctx.services.clinical.restorePatient(payload.id)
         return { ok: true as const }
       }
     },

@@ -22,7 +22,9 @@ const MIGRATION_0001 = `
 -- 0001_initial_schema — core platform, identity, clinical, billing, inventory, accounting
 -- ============================================================================================
 
-CREATE TABLE schema_migrations (
+-- The migration runner creates this table itself when the database file is brand new; the IF NOT
+-- EXISTS keeps the first migration idempotent with that bootstrap step.
+CREATE TABLE IF NOT EXISTS schema_migrations (
   version      INTEGER PRIMARY KEY,
   name         TEXT    NOT NULL,
   checksum     TEXT    NOT NULL,

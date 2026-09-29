@@ -1206,10 +1206,19 @@ export class PrinterProfileRepository {
 export function applyInitialDefaults(db: SqliteDatabase, appVersion = DEFAULT_BUILD_INFO.version): void {
   const run = db.transaction(() => {
     const meta = new MetaRepository(db)
-    meta.set('data_format_version', '1')
+    // Only fill in what is missing: this runs on every start and must never overwrite the clinic's data.
+    if (meta.get('data_format_version') === null) meta.set('data_format_version', '1')
+    if (meta.get('first_run_at') === null) meta.set('first_run_at', nowSql())
     meta.set('app_version', appVersion)
-    meta.set('first_run_at', nowSql())
-    new SettingsRepository(db).setMany(DEFAULT_SETTINGS, 'system')
+
+    const storedKeys = new Set(
+      (db.prepare('SELECT key FROM settings').all() as { key: string }[]).map((row) => row.key)
+    )
+    const missing: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(DEFAULT_SETTINGS) as [string, unknown][]) {
+      if (!storedKeys.has(key)) missing[key] = value
+    }
+    if (Object.keys(missing).length > 0) new SettingsRepository(db).setMany(missing, 'system')
   })
   run()
 }

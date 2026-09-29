@@ -32,7 +32,7 @@ import { closeDatabase, openDatabase, type SqliteDatabase } from './db/connectio
 import { Logger, setGlobalLogger } from './logging/logger'
 import { SessionManager } from './security/session'
 import { PrintHost } from './printing/print-host'
-import { createServices, type Services } from './services/container'
+import { applyInitialDefaults, createServices, type Services } from './services/container'
 import { createRegistry, type Registry, type RegistryHost } from './ipc/registry'
 import { createInvoker } from './ipc/router'
 import { loadAppConfig, loadWindowState, saveWindowState, type PersistedWindowState } from './window-state'
@@ -681,8 +681,14 @@ function buildContainerOptions(db: SqliteDatabase): Parameters<typeof createServ
         return activationStateHash(row?.value ?? createInstallId())
       }
     },
+    // A restore swaps the database file underneath the running app. reopenDb() therefore has to adopt the
+    // new connection as the module-level handle, otherwise rebuildContainer() (called right after the
+    // restore) would wire every service to the connection that was just closed.
     closeDb: () => closeDatabase(db),
-    reopenDb: () => openDatabase(current.databaseFile, { appVersion: BUILD_INFO.version }),
+    reopenDb: () => {
+      database = openDatabase(current.databaseFile, { appVersion: BUILD_INFO.version })
+      return database
+    },
     listSystemPrinters: async () => {
       if (!mainWindow) return []
       const printers = await mainWindow.webContents.getPrintersAsync()
@@ -728,6 +734,8 @@ function bootstrap(): void {
   if (!layout.databaseFile) throw new Error('The data folder layout is incomplete.')
 
   database = openDatabase(layout.databaseFile, { appVersion: BUILD_INFO.version })
+  // Idempotent: writes the system meta values and any setting that does not exist yet.
+  applyInitialDefaults(database, BUILD_INFO.version)
 
   const autoLockRow = database.prepare("SELECT value FROM settings WHERE key = 'autoLockMinutes'").get() as
     { value: string } | undefined
@@ -746,10 +754,12 @@ function bootstrap(): void {
 
   services = createServices(buildContainerOptions(database))
 
-  // System defaults are seeded once; both operations are idempotent.
+  // System defaults are seeded once; all three operations are idempotent and must finish before the
+  // setup wizard can create the first user (it needs the Administrator role to exist).
   const seed = database.transaction(() => {
     services!.permissions.syncCatalogue()
     services!.catalogue.seedDefaults()
+    services!.catalogue.seedRoles()
   })
   seed()
 

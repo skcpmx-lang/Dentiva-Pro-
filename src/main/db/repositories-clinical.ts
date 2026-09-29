@@ -61,6 +61,7 @@ function mapPatientRow(row: Record<string, unknown>): Patient {
     address: (row.address as string) ?? null,
     chiefComplaint: (row.chief_complaint as string) ?? null,
     isActive: Number(row.is_active) === 1,
+    isArchived: row.deleted_at != null,
     createdAt: row.created_at as string,
     lastVisitDate: (row.last_visit_date as string) ?? null,
     outstandingPoisha: Number(row.outstanding_poisha ?? 0),
@@ -92,10 +93,15 @@ export class PatientRepository {
   list(query: PatientQuery): Paged<PatientSummary> {
     const page = query.page ?? 1
     const pageSize = query.pageSize ?? 25
-    const where: string[] = ['p.deleted_at IS NULL']
+    const where: string[] = []
     const params: Record<string, unknown> = { limit: pageSize, offset: (page - 1) * pageSize }
 
-    if (!query.includeInactive) where.push('p.is_active = 1')
+    // Archived (soft-deleted) and deactivated patients are hidden unless the register explicitly
+    // asks for them, in which case the caller must display which state each row is in.
+    if (!query.includeArchived) {
+      where.push('p.deleted_at IS NULL')
+      where.push('p.is_active = 1')
+    }
     if (query.range && query.range !== 'all' && query.range !== 'custom') {
       where.push(`date(p.created_at) >= date(?)`)
       params.rangeFrom = rangeStart(query.range)
@@ -267,6 +273,13 @@ export class PatientRepository {
     this.db
       .prepare('UPDATE patients SET deleted_at = ?, updated_at = ?, updated_by = ? WHERE id = ?')
       .run(NOW(), NOW(), actor, id)
+  }
+
+  /** Undo an archive. The record itself was never deleted, so restoring is an exact reversal. */
+  restore(id: number, actor: string): void {
+    this.db
+      .prepare('UPDATE patients SET deleted_at = NULL, updated_at = ?, updated_by = ? WHERE id = ?')
+      .run(NOW(), actor, id)
   }
 
   counts(patientId: number): {
@@ -917,7 +930,7 @@ export class PrescriptionRepository {
                                       on_examination_json, diagnosis, advice_json, follow_up_date, notes, status,
                                       created_at, created_by, updated_at, updated_by)
            VALUES (@patientId, @visitId, @dentistId, @prescriptionDate, @chiefComplaints, @onExamination, @diagnosis,
-                   @advice, @followUpDate, @notes, 'final', @createdAt, @createdBy, @updatedAt, @updatedBy)`
+                   @advice, @followUpDate, @notes, @status, @createdAt, @createdBy, @updatedAt, @updatedBy)`
         )
         .run({
           patientId: input.patientId,
@@ -930,6 +943,7 @@ export class PrescriptionRepository {
           advice: JSON.stringify(input.advice ?? []),
           followUpDate: input.followUpDate ?? null,
           notes: input.notes ?? null,
+          status: input.status ?? 'draft',
           createdAt: NOW(),
           createdBy: actor,
           updatedAt: NOW(),
@@ -949,7 +963,8 @@ export class PrescriptionRepository {
           `UPDATE prescriptions SET patient_id = @patientId, visit_id = @visitId, dentist_id = @dentistId,
                   prescription_date = @prescriptionDate, chief_complaints_json = @chiefComplaints,
                   on_examination_json = @onExamination, diagnosis = @diagnosis, advice_json = @advice,
-                  follow_up_date = @followUpDate, notes = @notes, updated_at = @updatedAt, updated_by = @updatedBy
+                  follow_up_date = @followUpDate, notes = @notes, status = @status,
+                  updated_at = @updatedAt, updated_by = @updatedBy
             WHERE id = @id`
         )
         .run({
@@ -964,6 +979,7 @@ export class PrescriptionRepository {
           advice: JSON.stringify(input.advice ?? []),
           followUpDate: input.followUpDate ?? null,
           notes: input.notes ?? null,
+          status: input.status ?? 'draft',
           updatedAt: NOW(),
           updatedBy: actor
         })
@@ -1379,6 +1395,8 @@ export class QueueRepository {
            JOIN patients p ON p.id = q.patient_id
            LEFT JOIN dentists d ON d.id = q.dentist_id
           WHERE q.queue_date = ?
+          -- Priority always wins: an emergency or urgent patient is never pushed behind a routine one by a
+          -- manual reorder. Within the same priority the staff order (position) is respected.
           ORDER BY CASE q.priority WHEN 'emergency' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END, q.position, q.id`
       )
       .all(queueDate) as Record<string, unknown>[]
