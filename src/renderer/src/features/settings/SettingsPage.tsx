@@ -568,11 +568,11 @@ export function SettingsPage() {
               <Button
                 loading={busy === 'export'}
                 onClick={async () => {
-                  if (!app.hasPermission('data.export')) {
+                  if (!app.hasPermission('patients.export')) {
                     app.toast({
                       tone: 'warning',
                       title: 'Export not allowed',
-                      detail: 'Your role cannot export data.'
+                      detail: 'Your role cannot export the patient register.'
                     })
                     return
                   }
@@ -594,6 +594,12 @@ export function SettingsPage() {
                       title: `Exported ${result.rowCount} row(s)`,
                       detail: result.filePath
                     })
+                  } catch (cause) {
+                    app.toast({
+                      tone: 'error',
+                      title: 'Export failed',
+                      detail: cause instanceof Error ? cause.message : String(cause)
+                    })
                   } finally {
                     setBusy(null)
                   }
@@ -603,23 +609,40 @@ export function SettingsPage() {
               </Button>
               <Button
                 onClick={async () => {
-                  if (!app.hasPermission('data.export')) return
-                  const folder = await invoke('export.chooseFolder', {
-                    title: 'Choose a folder for the export'
-                  })
-                  if (!folder) return
-                  const result = await invoke('export.data', {
-                    entity: 'invoices',
-                    format: 'csv',
-                    from: addDaysIso(todayIso(), -365),
-                    to: todayIso(),
-                    targetFolder: folder
-                  })
-                  app.toast({
-                    tone: 'success',
-                    title: `Exported ${result.rowCount} invoice(s)`,
-                    detail: result.filePath
-                  })
+                  // The service exports invoices under the financial-report permission, so the button asks
+                  // for exactly the same permission instead of letting the call fail.
+                  if (!app.hasPermission('reports.financial.export')) {
+                    app.toast({
+                      tone: 'warning',
+                      title: 'Export not allowed',
+                      detail: 'Your role cannot export financial data.'
+                    })
+                    return
+                  }
+                  try {
+                    const folder = await invoke('export.chooseFolder', {
+                      title: 'Choose a folder for the export'
+                    })
+                    if (!folder) return
+                    const result = await invoke('export.data', {
+                      entity: 'invoices',
+                      format: 'csv',
+                      from: addDaysIso(todayIso(), -365),
+                      to: todayIso(),
+                      targetFolder: folder
+                    })
+                    app.toast({
+                      tone: 'success',
+                      title: `Exported ${result.rowCount} invoice(s)`,
+                      detail: result.filePath
+                    })
+                  } catch (cause) {
+                    app.toast({
+                      tone: 'error',
+                      title: 'Export failed',
+                      detail: cause instanceof Error ? cause.message : String(cause)
+                    })
+                  }
                 }}
               >
                 <FileDown size={16} /> Export invoices, last 12 months

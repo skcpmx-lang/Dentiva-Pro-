@@ -882,7 +882,7 @@ function TransactionsTab() {
       const folder = await invoke('export.chooseFolder', { title: 'Choose a folder for the export' })
       if (!folder) return
       const result = await invoke('export.data', {
-        entity: 'inventory_transactions',
+        entity: 'inventory_movements',
         format: 'csv',
         from: from || null,
         to: to || null,

@@ -66,7 +66,7 @@ export function AuditPage() {
       const folder = await invoke('export.chooseFolder', { title: 'Choose a folder for the audit export' })
       if (!folder) return
       const result = await invoke('export.data', {
-        entity: 'audit_log',
+        entity: 'audit',
         format: 'csv',
         from: from || null,
         to: to || null,

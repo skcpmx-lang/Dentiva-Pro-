@@ -156,6 +156,25 @@ describe('system roles', () => {
     expect(accountant?.permissions).toContain('reports.financial.view')
     expect(accountant?.permissions).not.toContain('prescriptions.create')
   })
+
+  it('gives every role that may export a dataset the channel permission the router checks', () => {
+    // `export.data` is gated on `data.export` at the router and then narrowed to the entity permission in
+    // the service. A role holding only the finer code would see an export button that the router refuses
+    // before the service ever runs, so the two must travel together.
+    const entityPermissions = [
+      'patients.export',
+      'inventory.export',
+      'audit.export',
+      'accounting.export',
+      'reports.financial.export'
+    ]
+    for (const role of SYSTEM_ROLES) {
+      const permissions = new Set<string>(role.permissions)
+      const fine = entityPermissions.filter((code) => permissions.has(code))
+      if (fine.length === 0) continue
+      expect(permissions.has('data.export'), `${role.code} may export ${fine.join(', ')}`).toBe(true)
+    }
+  })
 })
 
 describe('effective permissions', () => {

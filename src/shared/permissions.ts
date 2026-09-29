@@ -499,6 +499,10 @@ export const SYSTEM_ROLES: readonly SystemRoleDefinition[] = [
       'users.view',
       'audit.view',
       'audit.export',
+      // The router gates the export channel on `data.export` and the service then narrows to the entity
+      // permission, so a role that may export one dataset must also carry the channel permission or its
+      // own export button would be refused before the service ever sees it.
+      'data.export',
       'notifications.view',
       'settings.view'
     ]
