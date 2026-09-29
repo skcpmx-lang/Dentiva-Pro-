@@ -220,7 +220,7 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
     await expect(page.getByText(/dental caries/i).first()).toBeVisible({ timeout: 20_000 })
     // ... and on the visits tab, with the treatment that was performed.
     await page
-      .getByRole('tab', { name: /^visits$/i })
+      .getByRole('tab', { name: /^visits/i })
       .first()
       .click()
     await expect(page.getByText(/composite filling/i).first()).toBeVisible({ timeout: 20_000 })
