@@ -21,6 +21,7 @@ import { createInvoker } from '@main/ipc/router'
 import { createRegistry } from '@main/ipc/registry'
 import { createHeadlessHost } from '@main/services/headless'
 import { buildPrintDocument } from '@main/printing/build-document'
+import { readThirdPartyNotices, repositoryNoticeFile } from '@main/services/third-party'
 import { Logger } from '@main/logging/logger'
 import { APP_INFO } from '@shared/constants'
 import type { AppEvent, LogBundle, RuntimeInfo } from '@shared/ipc'
@@ -235,8 +236,8 @@ function buildPreview(options: PreviewServerOptions): {
     recentLogs: (): LogBundle => ({ entries: [], files: [] }),
     exportLogs: async () => null,
     dataRoot: () => host.layout.root,
-    userGuidePath: () => join(process.cwd(), 'docs', 'user-guide'),
-    thirdPartyNotices: () => join(process.cwd(), 'docs', 'compliance', 'THIRD-PARTY-NOTICES.md'),
+    userGuidePath: () => join(process.cwd(), 'docs', 'user-guide', 'USER_GUIDE.html'),
+    thirdPartyNotices: () => readThirdPartyNotices([repositoryNoticeFile(process.cwd())]),
     runtimeInfo: (): RuntimeInfo => ({
       productName: APP_INFO.productName,
       version: appVersion,

@@ -33,7 +33,11 @@ import { Logger, setGlobalLogger } from './logging/logger'
 import { SessionManager } from './security/session'
 import { PrintHost } from './printing/print-host'
 import { applyInitialDefaults, createServices, type Services } from './services/container'
-import { countThirdPartyComponents, noticeFileCandidates } from './services/third-party'
+import {
+  countThirdPartyComponents,
+  noticeFileCandidates,
+  readThirdPartyNotices
+} from './services/third-party'
 import { SettingsRepository } from './db/repositories-core'
 import { createRegistry, type Registry, type RegistryHost } from './ipc/registry'
 import { createInvoker } from './ipc/router'
@@ -440,15 +444,8 @@ function createHost(): RegistryHost {
     },
     dataRoot: () => layout?.root ?? '',
     userGuidePath: () => findResource('user-guide', 'USER_GUIDE.html'),
-    thirdPartyNotices: () => {
-      // Packaged: resources/legal/THIRD-PARTY-NOTICES.txt. Development: docs/compliance/THIRD-PARTY-NOTICES.txt.
-      const file = findResource('legal', 'THIRD-PARTY-NOTICES.txt')
-      try {
-        return existsSync(file) ? readFileSync(file, 'utf8') : ''
-      } catch {
-        return ''
-      }
-    },
+    thirdPartyNotices: () =>
+      readThirdPartyNotices(noticeFileCandidates(process.resourcesPath ?? null, app.getAppPath())),
     runtimeInfo: (): RuntimeInfo => {
       const current = requireServices()
       const sqlite = String((current.db.prepare('SELECT sqlite_version() AS v').get() as { v: string }).v)

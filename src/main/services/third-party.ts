@@ -55,3 +55,22 @@ export function noticeFileCandidates(resourcesPath: string | null, appPath: stri
 export function repositoryNoticeFile(repositoryRoot: string): string {
   return join(repositoryRoot, 'docs', 'compliance', 'THIRD-PARTY-NOTICES.txt')
 }
+
+/**
+ * The notices text shown on the About page.
+ *
+ * Reading is intentionally forgiving: a fresh checkout that has not run `npm run licenses` yet shows a
+ * short explanation instead of an empty panel, so the About page never looks broken.
+ */
+export function readThirdPartyNotices(noticeFiles: string[]): string {
+  for (const file of noticeFiles) {
+    if (!file || !existsSync(file)) continue
+    try {
+      const text = readFileSync(file, 'utf8')
+      if (text.trim().length > 0) return text
+    } catch {
+      // unreadable: try the next candidate
+    }
+  }
+  return 'The third-party notice file has not been generated for this build yet. Run "npm run licenses".'
+}
