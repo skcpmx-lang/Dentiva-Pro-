@@ -298,7 +298,13 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
     expect(document.signature.clearanceMm).toBeGreaterThanOrEqual(25)
 
     await page.getByRole('link', { name: 'Prescriptions' }).first().click()
+    // The register lists the sheet with its diagnosis and the number of medicines ...
+    await expect(page.getByText('Dental caries').first()).toBeVisible({ timeout: 20_000 })
+    // ... and opening it shows the medicines exactly as they were written, schedule and all.
+    await page.getByRole('button', { name: 'Open' }).first().click()
     await expect(page.getByText('Amoxicillin 500 mg').first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('Paracetamol 500 mg').first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('If pain occurs').first()).toBeVisible()
   })
 
   test('an invoice is raised and a payment against it is recorded', async () => {
