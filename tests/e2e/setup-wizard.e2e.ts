@@ -107,15 +107,10 @@ test.describe('Setup wizard and application shell', () => {
   test('a wrong password is refused and the correct password is accepted', async () => {
     const { page } = app
     await invoke(page, 'auth.logout')
-    await page
-      .getByLabel(/^password$/i)
-      .first()
-      .fill('not-the-password')
-    await page
-      .getByRole('button', { name: /sign in/i })
-      .first()
-      .click()
-    // The service refuses the sign-in and the screen shows the reason in its alert region.
+    await expect(page.getByLabel(/^password$/i).first()).toBeVisible({ timeout: 20_000 })
+    // The username field is empty after signing out, and the screen refuses an empty username before the
+    // password is even checked, so the attempt fills both — exactly as a person would.
+    await signInThroughUi(page, 'not-the-password')
     const refusal = page.getByRole('alert').first()
     await expect(refusal).toBeVisible({ timeout: 15_000 })
     await expect(refusal).toContainText(/not correct|incorrect|not valid|wrong/i)

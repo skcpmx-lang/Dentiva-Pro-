@@ -211,6 +211,18 @@ test.describe('Critical flow: patient → visit → prescription → invoice →
       .catch(async () => {
         await page.getByText('E2E Flow Patient').first().click()
       })
+    // The visit shows up on the patient's timeline (its summary is the recorded diagnosis) ...
+    await page
+      .getByRole('tab', { name: /timeline/i })
+      .first()
+      .click()
+    await expect(page.getByText(/visit #/i).first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/dental caries/i).first()).toBeVisible({ timeout: 20_000 })
+    // ... and on the visits tab, with the treatment that was performed.
+    await page
+      .getByRole('tab', { name: /^visits$/i })
+      .first()
+      .click()
     await expect(page.getByText(/composite filling/i).first()).toBeVisible({ timeout: 20_000 })
   })
 
