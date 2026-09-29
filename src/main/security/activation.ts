@@ -42,8 +42,65 @@ const VERIFIER_CHUNKS: readonly string[] = [
 /** Master value used to bind the activation record to this installation. */
 const STATE_MASTER = 'e4b263cbd26244a33ff0ec43e36d63c3c92dbb0a75a3efdc432f35a443aa96a5'
 
+/**
+ * A verifier bound to one code digest. Production uses the single compiled-in instance below; tests and
+ * tools build their own with a fixture secret, so no test file ever needs to contain the clinic code and
+ * the shipped verifier stays the only place the real digest lives.
+ */
+export interface ActivationVerifier {
+  /** The digest this verifier compares against. */
+  expected(): Buffer
+  /** Derive the digest for a candidate code (exposed for diagnostics and tests). */
+  derive(code: string): Buffer
+  /** Verify a candidate code in constant time. */
+  verify(input: string): boolean
+  /** Hash stored alongside the activation record, binding it to this installation. */
+  stateHash(installId: string): string
+}
+
+export function createActivationVerifier(
+  expected: Buffer,
+  stateMaster: string = STATE_MASTER
+): ActivationVerifier {
+  const expectedValue = Buffer.from(expected)
+
+  return {
+    expected: () => Buffer.from(expectedValue),
+    derive: (code: string) =>
+      pbkdf2Sync(code.normalize('NFC'), buildSalt(), KDF_ITERATIONS, KDF_KEY_LENGTH, KDF_DIGEST),
+    verify: (input: string) => {
+      const normalized = normalizeActivationCode(input)
+      if (normalized.length === 0) return false
+      const derived = pbkdf2Sync(
+        normalized.normalize('NFC'),
+        buildSalt(),
+        KDF_ITERATIONS,
+        KDF_KEY_LENGTH,
+        KDF_DIGEST
+      )
+      if (derived.length !== expectedValue.length) return false
+      return timingSafeEqual(derived, expectedValue)
+    },
+    stateHash: (installId: string) =>
+      createHash('sha256')
+        .update(`${expectedValue.toString('hex')}|${installId}|${stateMaster}`)
+        .digest('hex')
+  }
+}
+
+/** Build a verifier from the code itself. Only tests and tooling use this — the application never does. */
+export function createVerifierFromSecret(secret: string, stateMaster?: string): ActivationVerifier {
+  const derived = pbkdf2Sync(secret.normalize('NFC'), buildSalt(), KDF_ITERATIONS, KDF_KEY_LENGTH, KDF_DIGEST)
+  return createActivationVerifier(derived, stateMaster)
+}
+
+/** The verifier the shipped application uses. */
+export const shippedActivationVerifier: ActivationVerifier = createActivationVerifier(
+  Buffer.from(VERIFIER_CHUNKS.join(''), 'hex')
+)
+
 export function expectedVerifier(): Buffer {
-  return Buffer.from(VERIFIER_CHUNKS.join(''), 'hex')
+  return shippedActivationVerifier.expected()
 }
 
 /** Normalise user input: trim, drop separators/spaces, transliterate Bengali digits to ASCII. */
@@ -55,17 +112,12 @@ export function normalizeActivationCode(input: string): string {
 }
 
 export function deriveVerifier(code: string): Buffer {
-  return pbkdf2Sync(code.normalize('NFC'), buildSalt(), KDF_ITERATIONS, KDF_KEY_LENGTH, KDF_DIGEST)
+  return shippedActivationVerifier.derive(code)
 }
 
 /** Verify a candidate code in constant time. */
 export function verifyActivationCode(input: string): boolean {
-  const normalized = normalizeActivationCode(input)
-  if (normalized.length === 0) return false
-  const derived = deriveVerifier(normalized)
-  const expected = expectedVerifier()
-  if (derived.length !== expected.length) return false
-  return timingSafeEqual(derived, expected)
+  return shippedActivationVerifier.verify(input)
 }
 
 /**
@@ -73,8 +125,10 @@ export function verifyActivationCode(input: string): boolean {
  * Binds the verifier to the installation id and to the application master value.
  */
 export function activationStateHash(installId: string, verifierHex?: string): string {
-  const verifier = verifierHex ?? expectedVerifier().toString('hex')
-  return createHash('sha256').update(`${verifier}|${installId}|${STATE_MASTER}`).digest('hex')
+  if (verifierHex !== undefined) {
+    return createHash('sha256').update(`${verifierHex}|${installId}|${STATE_MASTER}`).digest('hex')
+  }
+  return shippedActivationVerifier.stateHash(installId)
 }
 
 export function createInstallId(): string {

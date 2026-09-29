@@ -12,6 +12,15 @@ import { verifyActivationCode, deriveVerifier, expectedVerifier } from '@main/se
 
 const activationCode = process.env.DENTIVA_ACTIVATION_CODE ?? ''
 const withCode = describe.skipIf(activationCode.length === 0)
+/** Environment-dependent case: runs only where the code is provided, so no literal is ever committed. */
+const itWithCode = activationCode.length > 0 ? it : it.skip
+
+/** The same code with its last digit moved on by one: a code-shaped variant that must never activate. */
+function oneDigitVariant(code: string): string {
+  const last = code.slice(-1)
+  const replacement = /[0-9]/.test(last) ? String((Number(last) + 1) % 10) : '0'
+  return `${code.slice(0, -1)}${replacement}`
+}
 
 let harness: Harness
 
@@ -27,7 +36,12 @@ describe('activation verifier', () => {
   it('rejects anything that is not the activation code', () => {
     expect(verifyActivationCode('')).toBe(false)
     expect(verifyActivationCode('0000000000000000')).toBe(false)
-    expect(verifyActivationCode('1516591935015164')).toBe(false)
+    expect(verifyActivationCode('not-a-code')).toBe(false)
+  })
+
+  itWithCode('accepts the configured code and refuses a one-digit variant of it', () => {
+    expect(verifyActivationCode(activationCode)).toBe(true)
+    expect(verifyActivationCode(oneDigitVariant(activationCode))).toBe(false)
   })
 
   it('stores only a derived verifier, never the code', () => {

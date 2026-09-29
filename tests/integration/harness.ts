@@ -14,7 +14,7 @@ import { closeDatabase, openDatabase, type SqliteDatabase } from '@main/db/conne
 import { ensureLayout, resolveLayout, type DataLayout } from '@main/storage/paths'
 import { SessionManager } from '@main/security/session'
 import { applyInitialDefaults, createServices, type Services } from '@main/services/container'
-import { verifyActivationCode } from '@main/security/activation'
+import { activationStateHash, verifyActivationCode } from '@main/security/activation'
 import type { PatientInput } from '@shared/types'
 
 export const BUILD_INFO = {
@@ -90,7 +90,13 @@ export function createHarness(): Harness {
         markActivated: () => {
           activated = true
         },
-        activationStateHash: () => 'test-state-hash'
+        // The real binding: the setup service stores this value and later verifies it, so the harness must
+        // derive it from the installation id exactly like the application does.
+        activationStateHash: () => {
+          const row = db.prepare("SELECT value FROM app_meta WHERE key = 'install_id'").get() as
+            { value: string } | undefined
+          return activationStateHash(row?.value ?? 'unset-install-id')
+        }
       },
       closeDb: () => closeDatabase(connection),
       reopenDb: () => {

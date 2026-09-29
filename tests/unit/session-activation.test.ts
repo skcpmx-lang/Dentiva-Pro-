@@ -9,14 +9,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ACTIVATION_KDF,
-  activationStateHash,
   createInstallId,
+  createVerifierFromSecret,
   deriveVerifier,
   evaluateThrottle,
   expectedVerifier,
   nextThrottleState,
-  normalizeActivationCode,
-  verifyActivationCode
+  normalizeActivationCode
 } from '@main/security/activation'
 import { SessionManager } from '@main/security/session'
 import { LOGIN_POLICY } from '@shared/constants'
@@ -193,35 +192,54 @@ describe('session manager', () => {
 })
 
 describe('activation verifier', () => {
-  const code = '1516591935015165'
+  // A fixture secret keeps the clinic code out of the repository: the shipped digest is only ever
+  // exercised against the code itself through `DENTIVA_ACTIVATION_CODE` (setup-auth suite and the CI
+  // gate). Everything the verifier must guarantee can be proven with this fixture.
+  const fixtureCode = '2026000000000000'
+  const fixture = createVerifierFromSecret(fixtureCode)
 
-  it('accepts the clinic code and rejects anything else', () => {
-    expect(verifyActivationCode(code)).toBe(true)
-    expect(verifyActivationCode('1516591935015164')).toBe(false)
-    expect(verifyActivationCode('1516591935015166')).toBe(false)
-    expect(verifyActivationCode('')).toBe(false)
-    expect(verifyActivationCode('not-a-code')).toBe(false)
+  it('accepts the code it was built from and rejects anything else', () => {
+    expect(fixture.verify(fixtureCode)).toBe(true)
+    expect(fixture.verify('2026000000000001')).toBe(false)
+    expect(fixture.verify('202600000000000')).toBe(false)
+    expect(fixture.verify('20260000000000000')).toBe(false)
+    expect(fixture.verify('')).toBe(false)
+    expect(fixture.verify('not-a-code')).toBe(false)
   })
 
   it('normalises the code typed by hand: spaces, dashes and Bengali digits', () => {
-    expect(normalizeActivationCode(' 1516 5919 3501 5165 ')).toBe(code)
-    expect(normalizeActivationCode('1516-5919-3501-5165')).toBe(code)
-    expect(normalizeActivationCode('১৫১৬৫৯১৯৩৫০১৫১৬৫')).toBe(code)
+    expect(normalizeActivationCode(' 2026 0000 0000 0000 ')).toBe(fixtureCode)
+    expect(normalizeActivationCode('2026-0000-0000-0000')).toBe(fixtureCode)
+    expect(normalizeActivationCode('২০২৬০০০০০০০০০০০০')).toBe(fixtureCode)
     expect(normalizeActivationCode('')).toBe('')
   })
 
-  it('verifies a derived verifier without storing the code itself', () => {
-    // The shipped artefact is a PBKDF2 digest; the code is never written anywhere in the repository.
-    expect(deriveVerifier(code)).toEqual(expectedVerifier())
-    expect(expectedVerifier().toString('hex')).not.toContain(Buffer.from(code, 'utf8').toString('hex'))
+  it('derives a stable, one-way digest instead of storing the code', () => {
+    const derived = fixture.derive(fixtureCode)
+    expect(derived).toHaveLength(ACTIVATION_KDF.keyLength)
     expect(ACTIVATION_KDF.algorithm).toBe('pbkdf2-sha512')
-    expect(ACTIVATION_KDF.keyLength).toBe(expectedVerifier().length)
     expect(ACTIVATION_KDF.iterations).toBeGreaterThanOrEqual(100_000)
+    // Deterministic for the same input, and equal to the digest the verifier compares against.
+    expect(fixture.derive(fixtureCode).equals(derived)).toBe(true)
+    expect(derived.equals(fixture.expected())).toBe(true)
+    // The digest is not a plain hash of the code, and the code cannot be read back out of it.
+    expect(derived.toString('latin1')).not.toContain(fixtureCode)
+    expect(
+      derived.equals(Buffer.from(fixtureCode.padEnd(ACTIVATION_KDF.keyLength, '0').slice(0, 64), 'utf8'))
+    ).toBe(false)
+  })
+
+  it('ships only a 64-byte digest for the clinic code', () => {
+    const shipped = expectedVerifier()
+    expect(shipped).toHaveLength(ACTIVATION_KDF.keyLength)
+    // A digest is what is compiled in: it is not a code-shaped string and contains no typed characters.
+    expect(shipped.toString('hex')).toMatch(/^[0-9a-f]{128}$/)
+    expect(deriveVerifier('a-different-candidate').equals(shipped)).toBe(false)
   })
 
   it('binds the activation state to the installation it was activated on', () => {
-    expect(activationStateHash('install-a')).toBe(activationStateHash('install-a'))
-    expect(activationStateHash('install-a')).not.toBe(activationStateHash('install-b'))
+    expect(fixture.stateHash('install-a')).toBe(fixture.stateHash('install-a'))
+    expect(fixture.stateHash('install-a')).not.toBe(fixture.stateHash('install-b'))
     // A fresh install id is unique and looks like a UUID.
     const first = createInstallId()
     const second = createInstallId()
