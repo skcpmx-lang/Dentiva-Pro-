@@ -12,6 +12,10 @@ files:
   - '!**/*.{map,md,ts,tsx}'
   - '!node_modules/**/{test,tests,__tests__,doc,docs,example,examples}/**'
 
+npmRebuild: false
+nodeGypRebuild: false
+buildDependenciesFromSource: false
+
 asar: true
 asarUnpack:
   - node_modules/better-sqlite3/**
@@ -34,7 +38,6 @@ win:
         - x64
   icon: build/icon.ico
   artifactName: DentivaPro-Setup-${version}-${arch}.${ext}
-  publisherName: Shohan Khan
   legalTrademarks: Dentiva Pro
   requestedExecutionLevel: asInvoker
 
@@ -53,7 +56,6 @@ nsis:
   deleteAppDataOnUninstall: false
   include: build/installer.nsh
   differentialPackage: false
-  warnIfPackageWithArm: false
 
 portable:
   artifactName: DentivaPro-Portable-${version}-${arch}.${ext}
